@@ -15,6 +15,12 @@ Phase 2 (paths, opt-in): addons/dot_x -> addons/gs_x, dot_*.ext files inside the
 names them, addon-id keys in requires.*.json / provides.json / addons.lock, and the dot-sim crates / library names.
 Repository directories and GitHub repos are never renamed here (see --dir-script).
 
+Phase 3 (ids, everything else): every dot-/dot_/DOT_ id (repo, addon, crate, file, cvar, env var, log channel, user://
+file, wire key), Dot<Upper> and dotStats/dotX camel names become gs-/gs_/GS_/GS/gs, in text and in tracked paths; the old
+game names (OLD_NAMES) become the new ones. KEEP_RX lists the unrelated words that stay (red_dot, a crosshair dot_radius).
+projects.tsv: a renamed first column keeps the old name in the alias column, so `bootstrap sync` moves old checkouts.
+"all" is phases 1 and 3. tools/audit_old_names.py checks the result over every repository.
+
 Exit status: 0 done (or --check clean), 1 --check found old names, 2 usage error.
 """
 import argparse, fnmatch, json, os, re, subprocess, sys
@@ -162,12 +168,56 @@ class Phase2:
         return text
 
 
+KEEP_RX = r"red[-_ ]dot|(?i:dot[-_](?:radius|sight|colou?r|size|product)(?![a-z]))"
+OLD_NAMES = [  # (old, new): repository and directory names of the renamed games; longest first
+    ("arena-surf-dm-maps", "fc-surf-dm-maps"), ("game-playground-maps", "playlot-maps"), ("arena-dm-maps", "fc-dm-maps"),
+    ("game-playground", "game-playlot"), ("game-g2gfast", "game-airdrift"), ("g2gfast-maps", "airdrift-maps"),
+    ("arena-weapons", "fc-weapons"), ("arena_weapons", "fc_weapons"), ("game-arena", "game-fatal-contact"),
+    ("game_arena", "game_fatal_contact"), ("g2gfast", "airdrift"), ("G2gfast", "Airdrift"), ("G2GFAST", "AIRDRIFT"),
+]
+
+
+class Phase3:
+    RX = re.compile(r"(?P<keep>" + KEEP_RX + r")"
+                    r"|(?<=lib)(?P<lib>dot)(?=_[a-z])"
+                    r"|(?<![A-Za-z0-9])(?P<id>dot|Dot|DOT)(?=[-_][A-Za-z0-9])"
+                    r"|(?<![A-Za-z0-9])(?P<cls>Dot)(?=[A-Z0-9])"
+                    r"|(?<![A-Za-z0-9])(?P<camel>dot)(?=[A-Z]|stats)")
+    OLD = re.compile(r"(?<![A-Za-z0-9])(" + "|".join(re.escape(o) for o, _ in OLD_NAMES) + r")(?![A-Za-z0-9])")
+    NEW = dict(OLD_NAMES)
+    TO = {"dot": "gs", "Dot": "GS", "DOT": "GS"}
+
+    def _sub(self, m):
+        if m.group("keep"):
+            return m.group(0)
+        return self.TO[m.group(0)]
+
+    def apply(self, text, rel=""):
+        if os.path.basename(rel) == "projects.tsv":
+            return "".join(self._tsv_line(l) for l in text.splitlines(True))
+        return self.OLD.sub(lambda m: self.NEW[m.group(1)], self.RX.sub(self._sub, text))
+
+    def _tsv_line(self, line):
+        if line.startswith("#") or "\t" not in line:
+            return self.apply(line)
+        cols = line.rstrip("\n").split("\t")
+        new = [self.apply(c) for c in cols[:2]]
+        alias = cols[2].split(",") if len(cols) > 2 and cols[2] else []
+        if new[0] != cols[0] and cols[0] not in alias:
+            alias.append(cols[0])
+        return "\t".join(new + ([",".join(alias)] if alias else []) + cols[3:]) + "\n"
+
+    def leftovers(self, text):
+        return sorted({m.group(0) for m in self.RX.finditer(text) if not m.group("keep")} | set(self.OLD.findall(text)))
+
+
 def process(repo, mapping, phases, mode):
     repo = os.path.abspath(repo)
     skip = mapping["skip_paths"]
     names = (set(mapping["classes"]) | set(mapping["extra"]) | scan_decls(repo, skip)) - set(mapping["keep"])
     p1 = Phase1(names)
     p2 = Phase2(mapping["addons"], mapping["crates"]) if 2 in phases else None
+    p3 = Phase3() if 3 in phases else None
     changed, binaries, moves, left = [], [], [], {}
     old_bytes = [n.encode() for n in names]
     for rel in git_files(repo):
@@ -179,14 +229,18 @@ def process(repo, mapping, phases, mode):
             if rel.endswith(NATIVE_EXT) and os.path.isfile(path) and not os.path.islink(path):
                 with open(path, "rb") as f:
                     raw = f.read()
-                if b"Dot" in raw and any(n in raw for n in old_bytes):
+                if (b"Dot" in raw and any(n in raw for n in old_bytes)) or (p3 and b"dot_" in raw):
                     binaries.append(rel)
+            if p3 and p3.apply(rel) != rel and os.path.lexists(path):
+                moves.append((rel, p3.apply(rel)))
             continue
         new = p1.apply(text) if 1 in phases else text
         if p2:
             new = p2.apply(new, rel)
+        if p3:
+            new = p3.apply(new, rel)
         if mode == "check":
-            hits = p1.leftovers(text)
+            hits = (p1.leftovers(text) if 1 in phases else []) + (p3.leftovers(text) if p3 else [])
             if hits:
                 left[rel] = hits
         elif new != text:
@@ -197,6 +251,8 @@ def process(repo, mapping, phases, mode):
         dest = p2.rename_path(rel) if p2 else rel
         if 1 in phases:  # a file named after a class (none today) moves with it
             dest = os.path.join(os.path.dirname(dest), p1.apply(os.path.basename(dest)))
+        if p3:
+            dest = p3.apply(dest)
         if dest != rel:
             moves.append((rel, dest))
     if mode == "write":
@@ -260,7 +316,7 @@ def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument("repos", nargs="*")
     a.add_argument("--mapping", default=DEFAULT_MAPPING)
-    a.add_argument("--phase", default="1", choices=["1", "2", "all"])
+    a.add_argument("--phase", default="1", choices=["1", "2", "3", "all"])
     g = a.add_mutually_exclusive_group()
     g.add_argument("--dry-run", action="store_true", help="list what would change, write nothing")
     g.add_argument("--check", action="store_true", help="exit 1 if any old class name is left")
@@ -275,7 +331,7 @@ def main():
     if o.dir_script:
         dir_script(o.repos); return 0
     mapping = load_mapping(o.mapping)
-    phases = {"1": {1}, "2": {2}, "all": {1, 2}}[o.phase]
+    phases = {"1": {1}, "2": {2}, "3": {3}, "all": {1, 3}}[o.phase]
     mode = "check" if o.check else "dry" if o.dry_run else "write"
     dirty = 0
     for repo in o.repos:

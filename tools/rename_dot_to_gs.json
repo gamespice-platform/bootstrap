@@ -1,9 +1,7 @@
 {
 	"from": "Dot",
 	"to": "GS",
-	"keep": [
-		"DotSubmitInput"
-	],
+	"keep": [],
 	"extra": [
 		"Dot2D",
 		"Dot2DSelfTest",

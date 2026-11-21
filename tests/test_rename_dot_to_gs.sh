@@ -2,10 +2,11 @@
 # tools/rename_dot_to_gs.py on a throwaway repository: declared Dot classes (class_name, inner class, Rust struct,
 # plugin custom type) and their references become GS, a branch's own new class is picked up without a mapping entry,
 # lookalikes (red_dot, dotstats, Godot, a "keep" name, a skipped path) stay, a second run changes nothing, --check
-# passes after and fails before, and phase 2 renames only path-shaped dot_ names. Run: tests/test_rename_dot_to_gs.sh
+# passes after and fails before, phase 2 renames only path-shaped dot_ names, phase 3 renames every dot id and old
+# game name (red_dot, dot_radius, v.dot() stay), and audit_old_names.py passes, fails on a leftover and honours its allowlist. Run: tests/test_rename_dot_to_gs.sh
 set -u
 H="$(cd "$(dirname "$0")/.." && pwd)"
-T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+T="$(mktemp -d)"; trap '[ -n "${KEEP:-}" ] || rm -rf "$T"' EXIT; [ -n "${KEEP:-}" ] && echo "$T"
 pass=0; fail=0
 check() { if eval "$2"; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL: $1"; fi; }
 tool() { python3 -I "$H/tools/rename_dot_to_gs.py" --mapping "$T/map.json" "$@"; }
@@ -62,6 +63,30 @@ check "phase 2 lock key" 'grep -q "\"gs_foo\"" requires.pins.json'
 git add -A && git commit -qm p2
 tool --phase 2 . >/dev/null
 check "phase 2 second run changes nothing" '[ -z "$(git status --porcelain)" ]'
+
+cat > addons/gs_foo/ids.gd <<'X'
+var a := "user://dot_self_mute.json DOT_SHOT_FRAMES dotDownload dotstats DotStatDef libdot_sim.so"
+var b := "red_dot red_dot_window dot_radius dot_sight v.dot(u) Godot dotted"
+var c := "game-arena arena-weapons arena_weapons game-g2gfast g2gfast-maps arena-surf-dm-maps game-playground arena allocator"
+X
+printf 'dot-foo\tgit@x:o/dot-foo.git\n# dot-foo repos\nplain\tgit@x:o/plain.git\told-plain\n' > projects.tsv
+git add -A && git commit -qm ids
+tool --phase all . >/dev/null
+f=addons/gs_foo/ids.gd
+check "phase 3 ids" 'grep -qF "user://gs_self_mute.json GS_SHOT_FRAMES gsDownload gsstats GSStatDef libgs_sim.so" $f'
+check "phase 3 keeps words" 'grep -qF "red_dot red_dot_window dot_radius dot_sight v.dot(u) Godot dotted" $f'
+check "phase 3 old game names" 'grep -qF "game-fatal-contact fc-weapons fc_weapons game-airdrift airdrift-maps fc-surf-dm-maps game-playlot arena allocator" $f'
+check "phase 3 storage path" 'grep -q "user://gs_foo/save.cfg" addons/gs_foo/gs_foo.gd'
+check "phase 3 projects.tsv alias" 'printf "gs-foo\tgit@x:o/gs-foo.git\tdot-foo\n# gs-foo repos\nplain\tgit@x:o/plain.git\told-plain\n" | diff -q - projects.tsv >/dev/null'
+git add -A && git commit -qm p3
+tool --phase all . >/dev/null
+check "phase 3 second run changes nothing" '[ -z "$(git status --porcelain)" ]'
+printf 'repo\tdocs/plan.md\tDotFoo\tthe skipped path\n' > "$T/allow"
+check "audit clean" 'python3 -I "$H/tools/audit_old_names.py" --allow "$T/allow" . | grep -q "1 repositories, 0 leftovers"'
+echo 'var z := "dot_left arena-weapons"' > left.gd; git add left.gd
+check "audit fails on a leftover" '! python3 -I "$H/tools/audit_old_names.py" --allow /dev/null . >/dev/null'
+printf 'repo\tdocs/plan.md\tDotFoo\tthe skipped path\nrepo\tleft.gd\tdot_left\tthe test keeps it\nrepo\tleft.gd\tarena-weapons\tthe test keeps it\n' > "$T/allow"
+check "audit allowlist" 'python3 -I "$H/tools/audit_old_names.py" --allow "$T/allow" . >/dev/null'
 
 echo "rename_dot_to_gs: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
