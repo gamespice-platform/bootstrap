@@ -66,7 +66,8 @@ check "phase 2 second run changes nothing" '[ -z "$(git status --porcelain)" ]'
 
 cat > addons/gs_foo/ids.gd <<'X'
 var a := "user://dot_self_mute.json DOT_SHOT_FRAMES dotDownload dotstats DotStatDef libdot_sim.so"
-var b := "red_dot red_dot_window dot_radius dot_sight v.dot(u) Godot dotted"
+var b := "red_dot red_dot_window dot_radius dot_sight dot_degrees v.dot(u) Godot dotted"
+var e := "a\tdot_sim\ndot-net"
 var c := "game-arena arena-weapons arena_weapons game-g2gfast g2gfast-maps arena-surf-dm-maps game-playground arena allocator"
 X
 printf 'dot-foo\tgit@x:o/dot-foo.git\n# dot-foo repos\nplain\tgit@x:o/plain.git\told-plain\n' > projects.tsv
@@ -74,7 +75,8 @@ git add -A && git commit -qm ids
 tool --phase all . >/dev/null
 f=addons/gs_foo/ids.gd
 check "phase 3 ids" 'grep -qF "user://gs_self_mute.json GS_SHOT_FRAMES gsDownload gsstats GSStatDef libgs_sim.so" $f'
-check "phase 3 keeps words" 'grep -qF "red_dot red_dot_window dot_radius dot_sight v.dot(u) Godot dotted" $f'
+check "phase 3 keeps words" 'grep -qF "red_dot red_dot_window dot_radius dot_sight dot_degrees v.dot(u) Godot dotted" $f'
+check "phase 3 after a \\t or \\n escape" 'grep -qF "a\tgs_sim\ngs-net" $f'
 check "phase 3 old game names" 'grep -qF "game-fatal-contact fc-weapons fc_weapons game-airdrift airdrift-maps fc-surf-dm-maps game-playlot arena allocator" $f'
 check "phase 3 storage path" 'grep -q "user://gs_foo/save.cfg" addons/gs_foo/gs_foo.gd'
 check "phase 3 projects.tsv alias" 'printf "gs-foo\tgit@x:o/gs-foo.git\tdot-foo\n# gs-foo repos\nplain\tgit@x:o/plain.git\told-plain\n" | diff -q - projects.tsv >/dev/null'

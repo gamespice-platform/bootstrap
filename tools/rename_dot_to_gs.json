@@ -100,7 +100,9 @@
 		"docs/gs-rename-plan.md",
 		"tools/rename_dot_to_gs.json",
 		"tools/rename_dot_to_gs.py",
-		"tests/test_rename_dot_to_gs.sh"
+		"tests/test_rename_dot_to_gs.sh",
+		"tools/audit_old_names.py",
+		"tools/audit_old_names.allow"
 	],
 	"classes": [
 		"Dot2DAdminModifiers",

@@ -168,7 +168,7 @@ class Phase2:
         return text
 
 
-KEEP_RX = r"red[-_ ]dot|(?i:dot[-_](?:radius|sight|colou?r|size|product)(?![a-z]))"
+KEEP_RX = r"red[-_ ]dot|(?i:dot[-_](?:radius|sight|colou?r|size|product|degrees|art)(?![a-z]))"
 OLD_NAMES = [  # (old, new): repository and directory names of the renamed games; longest first
     ("arena-surf-dm-maps", "fc-surf-dm-maps"), ("game-playground-maps", "playlot-maps"), ("arena-dm-maps", "fc-dm-maps"),
     ("game-playground", "game-playlot"), ("game-g2gfast", "game-airdrift"), ("g2gfast-maps", "airdrift-maps"),
@@ -182,15 +182,18 @@ EMB = "|".join(f"[{w[0]}{w[0].lower()}]{w[1:]}" for w in (  # verbs and owners t
     "Count", "Add"))
 
 
+B = r"(?:(?<![A-Za-z0-9])|(?<=\\[ntr]))"  # a word start, also right after a \n, \t or \r escape in a string
+
+
 class Phase3:
     RX = re.compile(r"(?P<keep>" + KEEP_RX + r")"
                     r"|(?<=lib)(?P<lib>dot)(?=_[a-z])"
                     r"|(?<=\.config/)(?P<cfg>dot)(?![A-Za-z0-9])"
-                    r"|(?<![A-Za-z0-9])(?P<id>dot|Dot|DOT)(?=[-_][A-Za-z0-9])"
-                    r"|(?<![A-Za-z0-9])(?P<cls>Dot)(?=[A-Z0-9])"
-                    r"|(?<![A-Za-z0-9])(?P<camel>dot)(?=[A-Z]|stats)"
+                    r"|" + B + r"(?P<id>dot|Dot|DOT)(?=[-_][A-Za-z0-9])"
+                    r"|" + B + r"(?P<cls>Dot)(?=[A-Z0-9])"
+                    r"|" + B + r"(?P<camel>dot)(?=[A-Z]|stats)"
                     r"|(?<![A-Za-z0-9])(?P<emb>" + EMB + r")Dot(?![a-z])")  # ReadDotTable, isDot, ServerUserDot
-    OLD = re.compile(r"(?<![A-Za-z0-9])(" + "|".join(re.escape(o) for o, _ in OLD_NAMES) + r")(?![A-Za-z0-9])")
+    OLD = re.compile(B + r"(" + "|".join(re.escape(o) for o, _ in OLD_NAMES) + r")(?![A-Za-z0-9])")
     NEW = dict(OLD_NAMES)
     TO = {"dot": "gs", "Dot": "GS", "DOT": "GS"}
 
