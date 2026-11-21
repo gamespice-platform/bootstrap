@@ -17,3 +17,4 @@ Thumbs.db
 
 # Local dated backups of edited tools.
 tools/*.bak-*
+__pycache__/

@@ -177,12 +177,19 @@ OLD_NAMES = [  # (old, new): repository and directory names of the renamed games
 ]
 
 
+EMB = "|".join(f"[{w[0]}{w[0].lower()}]{w[1:]}" for w in (  # verbs and owners that prefix a Dot name in website-city
+    "Read", "List", "Play", "Ensure", "Is", "Ingest", "Normalize", "ServerUser", "Save", "Get", "Remove", "Delete",
+    "Count", "Add"))
+
+
 class Phase3:
     RX = re.compile(r"(?P<keep>" + KEEP_RX + r")"
                     r"|(?<=lib)(?P<lib>dot)(?=_[a-z])"
+                    r"|(?<=\.config/)(?P<cfg>dot)(?![A-Za-z0-9])"
                     r"|(?<![A-Za-z0-9])(?P<id>dot|Dot|DOT)(?=[-_][A-Za-z0-9])"
                     r"|(?<![A-Za-z0-9])(?P<cls>Dot)(?=[A-Z0-9])"
-                    r"|(?<![A-Za-z0-9])(?P<camel>dot)(?=[A-Z]|stats)")
+                    r"|(?<![A-Za-z0-9])(?P<camel>dot)(?=[A-Z]|stats)"
+                    r"|(?<![A-Za-z0-9])(?P<emb>" + EMB + r")Dot(?![a-z])")  # ReadDotTable, isDot, ServerUserDot
     OLD = re.compile(r"(?<![A-Za-z0-9])(" + "|".join(re.escape(o) for o, _ in OLD_NAMES) + r")(?![A-Za-z0-9])")
     NEW = dict(OLD_NAMES)
     TO = {"dot": "gs", "Dot": "GS", "DOT": "GS"}
@@ -190,6 +197,8 @@ class Phase3:
     def _sub(self, m):
         if m.group("keep"):
             return m.group(0)
+        if m.group("emb"):
+            return m.group("emb") + "GS"
         return self.TO[m.group(0)]
 
     def apply(self, text, rel=""):
