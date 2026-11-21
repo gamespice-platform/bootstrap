@@ -70,10 +70,10 @@ function Fetch([string]$rel, [string]$dest, [string]$sha, $entry = $null, $prog 
         $sha = if ($entry) { Pin $entry $b } else { $sha }
         $before = if ($prog) { $prog.Done } else { 0 }
         try {
-            if ($b -match '^[a-z]+://') { Invoke-DotDownload "$b/$rel" $part -Progress $prog -Resume }
+            if ($b -match '^[a-z]+://') { Invoke-GSDownload "$b/$rel" $part -Progress $prog -Resume }
             else {
                 Copy-Item -LiteralPath (Join-Path $b $rel) $part -Force
-                if ($prog) { $prog.Done += (Get-Item -LiteralPath $part).Length; Write-DotProgress $prog }
+                if ($prog) { $prog.Done += (Get-Item -LiteralPath $part).Length; Write-GSProgress $prog }
             }
             # The site stores some objects gzip-encoded and a CDN may send them as-is; the sha256 names the decoded bytes.
             if ((Get-Sha $part) -ne $sha -and (Test-Gzip $part)) { Expand-Gzip $part }
@@ -157,12 +157,12 @@ foreach ($p in $doc.packs) {
         $bytes = [long]0; foreach ($t in $todo) { $bytes += $t.Size }
         if ($todo.Count) {
             $already = if ($todo.Count -lt $files.Count) { ", $($files.Count - $todo.Count) already here" } else { '' }
-            Write-Host ("fetching {0} {1}: {2} files, {3} MB{4}" -f $p.id, $p.version, $todo.Count, (Format-DotSize $bytes), $already)
+            Write-Host ("fetching {0} {1}: {2} files, {3} MB{4}" -f $p.id, $p.version, $todo.Count, (Format-GSSize $bytes), $already)
         }
-        $prog = New-DotProgress $p.id $bytes $todo.Count
+        $prog = New-GSProgress $p.id $bytes $todo.Count
         $k = 0
         foreach ($t in $todo) { $k++; $prog.File = $k; Fetch $t.Obj $t.Dest $t.Sha $null $prog }
-        Write-DotProgress $prog -Final
+        Write-GSProgress $prog -Final
         Set-Content -NoNewline -Path $stamp -Value "$want`n"
         if ($kind -eq 'store') { Remove-Item -Force $man }
         Write-Host "fetched $($p.id) $($p.version) $($files.Count) files"

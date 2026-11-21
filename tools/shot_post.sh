@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Posts a screenshot and its motion to Nightly -> Review: the still, plus an mp4 made from "<still>.seq/NNN.png" (DotShotSeq).
+# Posts a screenshot and its motion to Nightly -> Review: the still, plus an mp4 made from "<still>.seq/NNN.png" (GSShotSeq).
 #   shot_post.sh KEY ENTRY STILL.png [--title T] [--look "what to look for"] [--metrics '{"fps":60}'] [--fps N] [--variant before|after] [--label L]
 # Env: QA_URL, QA_USER, QA_PASSWORD as for review-post.sh. Run tools/screenshot.sh with GS_SHOT_FRAMES=16 GS_SHOT_SECS=2 first.
 set -euo pipefail

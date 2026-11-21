@@ -9,31 +9,31 @@ $big = [IO.File]::ReadAllBytes("$T/cdn/big")
 function Same($f) { $b = [IO.File]::ReadAllBytes($f); $b.Length -eq $big.Length -and [Linq.Enumerable]::SequenceEqual($b, $big) }
 
 # A whole download prints its own lines (name, MB done / total, MB/s, ETA) and a done line.
-$out = & { Invoke-DotDownload "$U/big" "$T/big1" } 6>&1 | Out-String
+$out = & { Invoke-GSDownload "$U/big" "$T/big1" } 6>&1 | Out-String
 Check 'big downloaded whole' (Same "$T/big1")
 Check 'progress line with name, total, rate, ETA' ($out -match 'big\s+[\d.]+ / 3\.0 MB  [\d.]+ MB/s  ETA ')
 Check 'done line' ($out -match 'done 3\.0 MB in ')
 
 # A 404 throws and leaves no file.
-$e = $null; try { Invoke-DotDownload "$U/nothing" "$T/none" } catch { $e = "$_" }
+$e = $null; try { Invoke-GSDownload "$U/nothing" "$T/none" } catch { $e = "$_" }
 Check '404 throws' ($e -match 'HTTP 404')
 Check '404 leaves no file' (-not (Test-Path "$T/none"))
 
 # A connection that goes quiet fails after GS_DOWNLOAD_STALL instead of hanging.
-$env:GS_DOWNLOAD_STALL = '2'; $script:DotHttp = $null
+$env:GS_DOWNLOAD_STALL = '2'; $script:GSHttp = $null
 $w = [Diagnostics.Stopwatch]::StartNew(); $e = $null
-try { Invoke-DotDownload "$U/hang" "$T/hang" 6>$null } catch { $e = "$_" }
+try { Invoke-GSDownload "$U/hang" "$T/hang" 6>$null } catch { $e = "$_" }
 Check "stall throws ($e)" ($e -match 'stalled')
 Check "stall fails fast ($([int]$w.Elapsed.TotalSeconds) s)" ($w.Elapsed.TotalSeconds -lt 15)
-Remove-Item Env:GS_DOWNLOAD_STALL; $script:DotHttp = $null
+Remove-Item Env:GS_DOWNLOAD_STALL; $script:GSHttp = $null
 
 # -Resume continues a part with a Range request; a whole part gets 416 and is left alone.
 [IO.File]::WriteAllBytes("$T/big2", $big[0..999999])
-$p = New-DotProgress 'r' $big.Length
-Invoke-DotDownload "$U/big" "$T/big2" -Progress $p -Resume 6>$null
+$p = New-GSProgress 'r' $big.Length
+Invoke-GSDownload "$U/big" "$T/big2" -Progress $p -Resume 6>$null
 Check 'resumed file whole' (Same "$T/big2")
 Check 'resume counts the part as done' ($p.Done -eq $big.Length)
-Invoke-DotDownload "$U/big" "$T/big2" -Resume 6>$null
+Invoke-GSDownload "$U/big" "$T/big2" -Resume 6>$null
 Check '416 keeps the whole file' (Same "$T/big2")
 $log = Get-Content -Raw "$T/server.log"
 Check 'Range sent' ($log -match 'GET /big HTTP/1.1 bytes=1000000-')

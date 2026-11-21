@@ -52,7 +52,7 @@ for r in repos:
             for m in re.finditer(r"res://addons/([a-z0-9_]+)/", t):
                 if m.group(1) in real: used.setdefault(m.group(1), f)
             if f.endswith(".gd"):
-                for m in re.finditer(r"\b(Dot\w+|[A-Z]\w+)\b", t):
+                for m in re.finditer(r"\b(GS\w+|[A-Z]\w+)\b", t):
                     a = cls.get(m.group(1))
                     if a: used.setdefault(a, f)
     optional = set(re.findall(r"^addons/([a-z0-9_]+)$", open(gi).read(), re.M)) if os.path.exists(gi) else set()

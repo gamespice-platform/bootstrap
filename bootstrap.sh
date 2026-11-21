@@ -1536,7 +1536,7 @@ export_natives() {
 # A library an addon loads itself at run time from a .cfg (GameSpice Net's snapshot core:
 # addons/dot_net/native/dot_net_native.cfg, see its docs/native.md). The export never
 # carries it, so export_game copies the .cfg and its release library into
-# <out>/<cfg name>/, the place DotNetNative looks beside the executable. One line per
+# <out>/<cfg name>/, the place GSNetNative looks beside the executable. One line per
 # addons/*/native/*.cfg holding an entry_symbol: "<cfg>\t<library path relative to the
 # cfg>"; the path is empty when it names none for <os> x86_64. Optional by design (the
 # addon falls back to GDScript), so a missing one is a warning, not a failed export.

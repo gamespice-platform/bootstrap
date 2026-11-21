@@ -123,7 +123,7 @@ param(
     [string[]]$Names = @()
 )
 # Never PowerShell's progress bar: on 5.1 it slows Invoke-WebRequest (and Expand-Archive) to a crawl. Downloads go through
-# tools\dot_download.ps1 (Invoke-DotDownload), which prints our own progress line: MB done / total, MB/s, ETA.
+# tools\dot_download.ps1 (Invoke-GSDownload), which prints our own progress line: MB done / total, MB/s, ETA.
 $ProgressPreference = 'SilentlyContinue'
 
 $ErrorActionPreference = 'Continue'
@@ -143,7 +143,7 @@ $script:linkedProjects = 0
 # no Developer Mode, and the filesystem resolves them before Godot sees them.
 # Measured, the last clause is false. On Windows 11 with Godot 4.7.2 the eight
 # junctions in game-fatal-contact\addons existed, Explorer walked them, and Godot
-# registered not one class_name from any of them: every Dot* identifier came back
+# registered not one class_name from any of them: every GS* identifier came back
 # "not declared in the current scope" and seventy-odd scripts failed to parse.
 # Copying the same folders fixed it outright.
 #
@@ -1178,7 +1178,7 @@ function Fetch-Natives ($proj) {
         if (-not $hit) { Warn $proj "natives: $($n.Repo) $($n.Tag) has no $plat library (GDScript runs, slower)"; continue }
         $zip = Join-Path ([System.IO.Path]::GetTempPath()) $hit[1]
         Say $proj "natives: downloading $($hit[1])" 'DarkGray'
-        try { Invoke-DotDownload "$base/$($hit[1])" $zip -Name $proj }
+        try { Invoke-GSDownload "$base/$($hit[1])" $zip -Name $proj }
         catch { Warn $proj "natives: could not download $($hit[1]): $($_.Exception.Message) (GDScript runs, slower)"; continue }
         if ((Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower() -ne $hit[0].ToLower()) {
             Remove-Item -Force $zip; Err $proj "natives: $($hit[1]) checksum mismatch, not installed"; continue
@@ -1229,7 +1229,7 @@ function Link-Content ($proj) {
                 if ($from -match '^https?://') {
                     $tar = Join-Path ([IO.Path]::GetTempPath()) 'dot-stores.tar'
                     Say $proj "downloading the art stores (a .tar, once) from $from"
-                    try { Invoke-DotDownload $from $tar -Name $proj; tar -xf $tar -C $target }
+                    try { Invoke-GSDownload $from $tar -Name $proj; tar -xf $tar -C $target }
                     catch { Warn $proj "could not download the art stores from ${from}: $($_.Exception.Message)" }
                     Remove-Item $tar -Force -ErrorAction SilentlyContinue
                 } elseif (Test-Path $from) {
@@ -1462,7 +1462,7 @@ function Get-GodotLatest {
         $base = "https://github.com/godotengine/godot-builds/releases/download/$tag"
         $zip = Join-Path $tmp $asset
         Say 'godot' "downloading $asset (about 80 MB)..."
-        Invoke-DotDownload "$base/$asset" $zip -Name 'godot'
+        Invoke-GSDownload "$base/$asset" $zip -Name 'godot'
         $sums = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri "$base/SHA512-SUMS.txt").Content
         # Served as application/octet-stream, so PowerShell hands back bytes, not text.
         if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
@@ -1588,7 +1588,7 @@ function Get-ExportTemplates ($tag) {
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Say 'templates' "downloading $asset (about 1.2 GB, once)..."
-        Invoke-DotDownload "$base/$asset" $tpz -Name 'templates'
+        Invoke-GSDownload "$base/$asset" $tpz -Name 'templates'
         $sums = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri "$base/SHA512-SUMS.txt").Content
         if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
         $want = ($sums -split "`n" | Where-Object { $_ -match [regex]::Escape($asset) + '\s*$' } | Select-Object -First 1) -split '\s+' | Select-Object -First 1
@@ -1728,7 +1728,7 @@ function Get-ExportNatives ($dir, $os) {
 
 # A library an addon loads itself at run time from a .cfg (GameSpice Net's snapshot core,
 # addons\dot_net\native\dot_net_native.cfg). The export never carries it, so Export-Game
-# copies the .cfg and its release library into <out>\<cfg name>\, where DotNetNative
+# copies the .cfg and its release library into <out>\<cfg name>\, where GSNetNative
 # looks beside the executable. One object per addons\*\native\*.cfg holding an
 # entry_symbol, with Cfg (full path) and Lib (relative to the cfg; empty when it names
 # none for $os x86_64). Each addon folder is listed by path, so a linked addon counts.
@@ -1909,7 +1909,7 @@ function Install-Tools {
         if ($env:GS_FASTGMAD_ZIP) { Copy-Item $env:GS_FASTGMAD_ZIP $zip }
         else {
             Say 'fastgmad' "downloading fastgmad $ver..."
-            Invoke-DotDownload "https://github.com/WilliamVenner/fastgmad/releases/download/v$ver/fastgmad_windows.zip" $zip -Name 'fastgmad'
+            Invoke-GSDownload "https://github.com/WilliamVenner/fastgmad/releases/download/v$ver/fastgmad_windows.zip" $zip -Name 'fastgmad'
         }
         $got = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
         if ($got -ne $sum) { Err 'fastgmad' "checksum mismatch (got $got); nothing installed"; return $false }

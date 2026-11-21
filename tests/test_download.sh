@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local test of tools/dot_download.ps1 (Invoke-DotDownload: own progress lines, 404, stall timeout, Range resume) and
+# Local test of tools/dot_download.ps1 (Invoke-GSDownload: own progress lines, 404, stall timeout, Range resume) and
 # fetch_lock.ps1 on top of it (file i/n progress, hash-mismatch retry), against a python fixture server. Needs pwsh
 # (that half is skipped without it), and fetch_lock.sh's own progress and retry lines. No network. Run: tests/test_download.sh
 set -uo pipefail

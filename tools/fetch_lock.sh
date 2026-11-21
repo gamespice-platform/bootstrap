@@ -4,7 +4,7 @@
 #                       [--only ITEM[,ITEM]] [--packs DIR] [--list]
 # Lock (written by dot-cloud's `publish --upload --lock`, format in dot-cloud docs/cdn-publish.md): {format, origin, mirrors[],
 # packs[{id, version, manifest_sha256, into, kind, optional}]}. kind "store" files are written to <root>/<into>; a kind "pack" is
-# mirrored to --packs DIR/<id>/<version>/ (manifest.json + objects/) when given, else left for DotCloudClient to mount.
+# mirrored to --packs DIR/<id>/<version>/ (manifest.json + objects/) when given, else left for GSCloudClient to mount.
 # WHERE FROM, first set wins: --from BASE (a folder or a full origin URL), GS_PACKS_FROM (`none` fetches nothing),
 #   --cdn URL / GS_CDN_URL, GS_CDN_URL in dot-bootstrap/.env (beside this tools/ folder; one edit for every repo), the lock's
 #   own `origin` then its `mirrors`, https://content.gamespice.net. A CDN URL is the site root: "/content" is added unless it ends in it.

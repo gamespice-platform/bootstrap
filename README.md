@@ -77,7 +77,7 @@ You can play a converted map folder or `.zip` without publishing it. Name it `<m
 
 - Put it in the game's user data `maps/` folder (Linux `~/.local/share/godot/app_userdata/<game>/maps`, Windows `%APPDATA%\Godot\app_userdata\<game>\maps`; `--play-export <game>` prints the exact folder).
 - In a source checkout, put it in `res://addons/maps`.
-- Drag it onto the window of a game that calls `DotMapLocalMaps.watch_drops` (Fatal Contact does).
+- Drag it onto the window of a game that calls `GSMapLocalMaps.watch_drops` (Fatal Contact does).
 
 It shows as `<title> (local)` and plays solo only. See [dot-map docs/content.md](https://github.com/gamespice-platform/map/blob/main/docs/content.md).
 
@@ -142,7 +142,7 @@ The CDN is the first of these that is set:
 5. The lock file's own `origin` and `mirrors`.
 6. `https://content.gamespice.net`.
 
-Download lists in `cfg/content/addons.yml` and `games.yml` (and `cfg/server/content/`) are respected. Packs are only mirrored when `--packs DIR` is given; otherwise `DotCloudClient` mounts them at run time. The raw art stores of `zombie-zone-maps` are fetched once and kept; set `GS_STORES_FROM=none` to skip them, or to a folder or `.tar` URL to use your own. On Windows the fetch scripts need PowerShell 7 (`pwsh`) or the Windows PowerShell 5.1 that ships with Windows 10 and later.
+Download lists in `cfg/content/addons.yml` and `games.yml` (and `cfg/server/content/`) are respected. Packs are only mirrored when `--packs DIR` is given; otherwise `GSCloudClient` mounts them at run time. The raw art stores of `zombie-zone-maps` are fetched once and kept; set `GS_STORES_FROM=none` to skip them, or to a folder or `.tar` URL to use your own. On Windows the fetch scripts need PowerShell 7 (`pwsh`) or the Windows PowerShell 5.1 that ships with Windows 10 and later.
 
 ## Publishing from a fresh clone
 
