@@ -10,7 +10,7 @@
 #     --projects FILE  tab-separated project list, first column the repo name (default: this repo's projects.tsv)
 #   env: LOCK_GAMES overrides the game list (space separated).
 # Default list: game-*, mg-*, GameSpice Game Template, GameSpice Server Deploy (not *-maps).
-# Tag rule: a pin below the newest v* tag of the addon checkout (sort -V, as dot-game-template tools/check-lock.sh,
+# Tag rule: a pin below the newest v* tag of the addon checkout (sort -V, as gs-game-template tools/check-lock.sh,
 # copied on purpose: the template is copied by third parties) or a pin that is not a v* tag (main, a branch) is
 # behind. A pin ahead of the local tags is a stale checkout, not a stale pin. Tags are as new as the last fetch.
 # Output: a "FLAG lock-behind: ..." line per stale pin, "FLAG lock-unreadable: ..." per unreadable one, "skip:" notes.
@@ -38,7 +38,7 @@ max=$((10#$max))
 if [ -n "${LOCK_GAMES:-}" ]; then games=$LOCK_GAMES
 else
     [ -r "$tsv" ] || die "no project list '$tsv'"
-    games=$(grep -v "^[[:space:]]*#" "$tsv" | cut -f1 | grep -E "^((game|mg)-|dot-game-template$|dot-server-deploy$)" | grep -v -- "-maps$")
+    games=$(grep -v "^[[:space:]]*#" "$tsv" | cut -f1 | grep -E "^((game|mg)-|gs-game-template$|gs-server-deploy$)" | grep -v -- "-maps$")
 fi
 stale=0; unreadable=0; locked=0; pins=0
 for g in $games; do

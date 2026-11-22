@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # GameSpice Bootstrap tools/readme/shot.sh: the README studio run, called by a pack's tools/readme_shot.sh from the pack root.
 #
-#   ../dot-bootstrap/tools/readme/shot.sh [--ids a,b]    studio PNGs into screenshots/readme/, and the READMEDATA line
-#   ../dot-bootstrap/tools/readme/shot.sh --data         only the READMEDATA line (headless, no GPU needed)
+#   ../gs-bootstrap/tools/readme/shot.sh [--ids a,b]    studio PNGs into screenshots/readme/, and the READMEDATA line
+#   ../gs-bootstrap/tools/readme/shot.sh --data         only the READMEDATA line (headless, no GPU needed)
 #
 # gen_readme.sh copies this script and readme_studio.{gd,tscn} into <pack>/tools/readme_studio/ (git-ignored) before
-# the run, because a GPU box gets the pack's tree and no sibling repositories; run from dot-bootstrap it copies them
+# the run, because a GPU box gets the pack's tree and no sibling repositories; run from gs-bootstrap it copies them
 # itself. It then imports the project and runs the studio. Shots need a real GPU: the pack's tools/readme_shot.sh matches gpu.sh's tools/*_shot.sh rule, so
 # `heavy -- tools/readme_shot.sh` renders on staging02/staging (Vulkan, Forward+), never llvmpipe or --headless.
 # README_RENDERER (default forward_plus) picks the renderer for the stills; the pack's own setting is not used.

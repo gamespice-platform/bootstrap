@@ -24,7 +24,7 @@
 #   ./bootstrap.sh --get-godot          download the latest stable Godot into .godot-bin beside this script; with --import, a selection or --discard-generated it carries on (sync, link, then import)
 #   ./bootstrap.sh --discard-generated   when an update is blocked, restore every modified .import/.uid file and retry
 #   ./bootstrap.sh game-fatal-contact mg-wipeout    the same as --only (names, short forms, globs)
-#   ./bootstrap.sh --games fc,wipeout --addons dot-core   games and/or addons by kind
+#   ./bootstrap.sh --games fc,wipeout --addons gs-core   games and/or addons by kind
 #   ./bootstrap.sh zees-games               every game, with the addons and content it needs
 #   ./bootstrap.sh --zees-games-min         every game, base repository + addons only
 #   ./bootstrap.sh mg-wipeout --min         --min: no maps, weapon, monster or other content packs
@@ -53,7 +53,7 @@
 #
 # Clone from somewhere else:  GS_GIT_BASE=git@gitlab.example/mine ./bootstrap.sh
 # Also add a second remote called `hub` (bare repos on a dev box):
-#   DOTHUB=ssh://you@10.50.0.185/home/you/git ./bootstrap.sh
+#   GSHUB=ssh://you@10.50.0.185/home/you/git ./bootstrap.sh
 #
 # WHY THIS SCRIPT EXISTS AT ALL
 #
@@ -103,16 +103,16 @@ done
 REPO_DIR="$(cd "$(dirname "$REAL_SELF")" && pwd)"
 
 # The directory holding the project repositories, in order of preference.
-if [ -n "${GS_PROJECTS:-${DOT_PROJECTS:-}}" ]; then
-    PROJECTS_DIR="${GS_PROJECTS:-${DOT_PROJECTS:-}}"
+if [ -n "${GS_PROJECTS:-}" ]; then
+    PROJECTS_DIR="${GS_PROJECTS:-}"
 elif [ -d "$SELF_DIR/godot" ]; then
     # Invoked from a game-dev tree root, almost certainly through the symlink.
     PROJECTS_DIR="$SELF_DIR/godot"
-elif { [ "$(basename "$REPO_DIR")" = "dot-bootstrap" ] \
+elif { [ "$(basename "$REPO_DIR")" = "gs-bootstrap" ] \
        || [ "$(basename "$REPO_DIR")" = "bootstrap" ]; } \
      && [ "$(basename "$(dirname "$REPO_DIR")")" = "godot" ] \
      && [ -f "$(dirname "$(dirname "$REPO_DIR")")/CLAUDE.md" ]; then
-    # This repository is itself a project directory: <tree>/godot/dot-bootstrap.
+    # This repository is itself a project directory: <tree>/godot/gs-bootstrap.
     #
     # Both leaf names, because this repository was renamed from `bootstrap` and a
     # clone made before that is still a correct clone. A name test that only knows
@@ -123,7 +123,7 @@ elif { [ "$(basename "$REPO_DIR")" = "dot-bootstrap" ] \
     #
     # All THREE conditions, because the obvious one-condition version of this
     # test -- "is my parent called godot" -- silently ate a real setup. A clone
-    # at F:\Godot\tmc-dot-bootstrap has a parent whose leaf is "Godot", and
+    # at F:\Godot\tmc-gs-bootstrap has a parent whose leaf is "Godot", and
     # PowerShell's -eq is case-INSENSITIVE, so bootstrap.ps1 matched: everything
     # was cloned to F:\Godot as siblings of the repository instead of into
     # ./projects, and the only sign was one line of output nobody had a reason
@@ -143,8 +143,8 @@ fi
 LIST="$REPO_DIR/projects.tsv"
 [ -f "$LIST" ] || LIST="$SELF_DIR/projects.tsv"
 
-GIT_BASE="${GS_GIT_BASE:-${DOT_GIT_BASE:-git@github.com:gamespice-platform}}"
-HUB="${DOTHUB:-}"
+GIT_BASE="${GS_GIT_BASE:-git@github.com:gamespice-platform}"
+HUB="${GSHUB:-}"
 
 # Whether to reach GitHub over HTTPS instead of SSH. HTTPS is the default: every
 # repository in projects.tsv is public, so HTTPS reads them with no credentials
@@ -209,7 +209,7 @@ err()  { printf '%-22s %s\n' "$1" "${RED}$2${OFF}"; fail=1; }
 # Every repository a sync could not bring up to date, listed again at the very end, so one
 # line among dozens of parallel jobs' output is not the only trace. Jobs run in subshells,
 # so they append to a file.
-STALE_FILE="$(mktemp 2>/dev/null || echo /tmp/dot-stale.$$)"; : > "$STALE_FILE"
+STALE_FILE="$(mktemp 2>/dev/null || echo /tmp/gs-stale.$$)"; : > "$STALE_FILE"
 trap 'rm -f "$STALE_FILE"' EXIT
 note_stale() { printf '%-22s %s\n' "$1" "$2" >> "$STALE_FILE"; }
 # A credential prompt in one of many parallel jobs is a hang nobody sees: a private or
@@ -257,8 +257,8 @@ missing_repo() {
 }
 
 # The addons a project needs linked in, read out of its own .gitignore. A
-# project's own addon is never in there -- GameSpice Net ignores dot_core and ships
-# dot_net -- which is exactly the distinction wanted.
+# project's own addon is never in there -- GameSpice Net ignores gs_core and ships
+# gs_net -- which is exactly the distinction wanted.
 links_for() {
     local gi; gi="$(gi_path "$1")"
     [ -f "$gi" ] || return 0
@@ -294,8 +294,8 @@ optional_for() {
     awk '/^# bootstrap-optional/{o=1; next} o && /^\/addons\//{sub("^/addons/",""); print} {o=0}' "$gi"
 }
 
-# Which repository an addon comes from. dot_user_avatar -> GameSpice User Avatar covers every
-# gs-* addon, but not a game's own pack: zee_weapons lives in zee-dot-weapons, and the
+# Which repository an addon comes from. gs_user_avatar -> GameSpice User Avatar covers every
+# gs-* addon, but not a game's own pack: zee_weapons lives in zee-gs-weapons, and the
 # name rule sent every game that used it looking for a zee-weapons nobody has. Rather
 # than a table of exceptions, ask the checkouts: the owner is the project that HAS the
 # folder and does not ignore it -- every consumer ignores it, linked or copied, and
@@ -304,7 +304,7 @@ addon_source() {
     local addon="$1" src="${1//_/-}" d
     # The listed name first (fc_weapons and its legacy arena_weapons are in fc-weapons),
     # then the raw one: a machine whose checkout has not been renamed yet still has it
-    # under arena-weapons.
+    # under its old directory name.
     d="$(canon "$src")"
     if [ -d "$PROJECTS_DIR/$d/addons/$addon" ]; then echo "$d"; return 0; fi
     if [ -d "$PROJECTS_DIR/$src/addons/$addon" ]; then echo "$src"; return 0; fi
@@ -313,7 +313,7 @@ addon_source() {
         # An old-name link left by a rename (see migrate_renamed) is not a second owner.
         [ -L "$d" ] && continue
         [ -d "$d/addons/$addon" ] && [ -d "$d/.git" ] || continue
-        # Git's own answer, not a line match: dot-server-deploy ignores /addons/ whole.
+        # Git's own answer, not a line match: gs-server-deploy ignores /addons/ whole.
         git -C "$d" check-ignore -q "addons/$addon" && continue
         echo "${d##*/}"; return 0
     done
@@ -340,14 +340,14 @@ current_addon_dir() { case "$1" in arena_weapons) echo fc_weapons ;; esac; }
 ONLY=()
 NO_DEPS=0
 # Repositories synced and games imported at once; --jobs N, GS_JOBS, else the CPU count.
-JOBS="${GS_JOBS:-${DOT_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}}"
+JOBS="${GS_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 DISCARD_GEN=0
 # --min: leave out content (maps, courses, worlds) and the optional packs a game marks
 # with "# bootstrap-optional" above their /addons/ line.
 MIN=0
 PLAN=0
 # --plan reads a project's .gitignore from here when it is not cloned yet.
-PLAN_FROM="${GS_PLAN_FROM:-${DOT_PLAN_FROM:-}}"
+PLAN_FROM="${GS_PLAN_FROM:-}"
 
 listed() { projects | grep -qxF "$1"; }
 
@@ -356,25 +356,25 @@ resolve_name() {
     local n="$1" p
     case "$n" in
         zees-games|games) games; return ;;
-        addons)           projects | grep -E '^dot-'; return ;;
+        addons)           projects | grep -E '^gs-'; return ;;
     esac
     case "$n" in
         *[*?[]*) projects | while read -r p; do [[ "$p" == $n ]] && echo "$p"; done; return ;;
     esac
-    for p in "$n" "game-$n" "mg-$n" "dot-$n"; do listed "$p" && { echo "$p"; return; }; done
+    for p in "$n" "game-$n" "mg-$n" "gs-$n"; do listed "$p" && { echo "$p"; return; }; done
     p="$(alias_target "$n")"; [ -n "$p" ] && echo "$p"
 }
 
 # The listed repository an addon comes from, clone or no clone. The name rule first;
-# then a checkout that owns it; then the listed name it matches with every "dot-"
-# taken out -- zee_weapons is zee-dot-weapons -- which is unambiguous because no two
+# then a checkout that owns it; then the listed name it matches with every "gs-"
+# taken out -- zee_weapons is zee-gs-weapons -- which is unambiguous because no two
 # names in projects.tsv are equal that way (`--check`'s neighbour, measured 10-07).
 addon_repo() {
     local src p
     src="$(canon "${1//_/-}")"
     listed "$src" && { echo "$src"; return; }
     p="$(addon_source "$1")"; listed "$p" && [ -d "$PROJECTS_DIR/$p/addons/$1" ] && { echo "$p"; return; }
-    projects | while read -r p; do [ "${p//dot-/}" = "${src//dot-/}" ] && { echo "$p"; break; }; done
+    projects | while read -r p; do [ "${p//gs-/}" = "${src//gs-/}" ] && { echo "$p"; break; }; done
 }
 
 # What a project needs on disk beside it: the repositories of its addons, and of any
@@ -476,7 +476,7 @@ pull_retry() {
     local wait_s
     pull_tries=0; pull_net=0
     for wait_s in 0 3 8; do
-        [ "$wait_s" -gt 0 ] && sleep "${GS_RETRY_SLEEP:-${DOT_RETRY_SLEEP:-$wait_s}}"
+        [ "$wait_s" -gt 0 ] && sleep "${GS_RETRY_SLEEP:-$wait_s}"
         pull_tries=$((pull_tries+1))
         pull_err="$(git "$@" "${fast[@]}" -C "$dir" pull -q --no-rebase --ff-only 2>&1 >/dev/null)"; pull_rc=$?
         [ $pull_rc -eq 0 ] && break
@@ -678,7 +678,7 @@ migrate_renamed() {
             n="$(basename "$(repo_path "$origin")")"
             if [ "$(repo_path "$origin")" != "$(repo_path "$url")" ] && [ "$n" != "$new" ] && [ "$(alias_target "$n")" != "$new" ]; then
                 why="$old's origin is $origin, not $new"
-            elif [ "${GS_NO_RENAME:-${DOT_NO_RENAME:-}}" = 1 ]; then
+            elif [ "${GS_NO_RENAME:-}" = 1 ]; then
                 why="GS_NO_RENAME=1"
             elif pid="$(in_use_by "$src")"; then
                 why="in use by process $pid ($(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | cut -c1-60))"
@@ -955,7 +955,7 @@ link_addons() {
 # bootstrap-optional line):
 #
 #     # bootstrap-natives: GameSpice Sim v0.1.0
-#     /addons/dot_sim
+#     /addons/gs_sim
 #
 # and this fetches that release's zip for this machine (SHA256SUMS.natives, checked)
 # and unpacks it at the addon repository's root, which is where ci/install.sh puts a
@@ -981,7 +981,7 @@ natives_for() {
 }
 
 # True when <libdir> already holds a library for <platform>: a non-empty <platform>/
-# directory (dot-sim's layout) or a Godot-named file such as
+# directory (gs-sim's layout) or a Godot-named file such as
 # libx.linux.template_release.x86_64.so or libx.macos.template_debug.universal.dylib.
 native_built_here() {
     local lib="$1" plat="$2" os="${2%-*}" arch="${2#*-}" f
@@ -1006,7 +1006,7 @@ native_platform() {
 
 fetch_natives() {
     local proj="$1" repo tag addon libdir lib plat dir stamp base tmp sums file want got
-    [ "${GS_NATIVES:-${DOT_NATIVES:-}}" = none ] && return 0
+    [ "${GS_NATIVES:-}" = none ] && return 0
     plat="$(native_platform)" || return 0
     while IFS=$'\t' read -r repo tag addon libdir; do
         [ -n "$repo" ] && [ -n "$tag" ] || continue
@@ -1025,8 +1025,8 @@ fetch_natives() {
             say "$proj" "${DIM}natives: keeps the $addon library built here ($plat)${OFF}"; continue
         fi
         # The organisation names its repositories without the dot- prefix; a named base keeps the directory name.
-        if [ -n "${GS_NATIVES_BASE:-${DOT_NATIVES_BASE:-}}" ]; then base="${GS_NATIVES_BASE:-${DOT_NATIVES_BASE:-}}/$repo/releases/download/$tag"
-        else base="https://github.com/gamespice-platform/${repo#dot-}/releases/download/$tag"; fi
+        if [ -n "${GS_NATIVES_BASE:-}" ]; then base="${GS_NATIVES_BASE:-}/$repo/releases/download/$tag"
+        else base="https://github.com/gamespice-platform/${repo#gs-}/releases/download/$tag"; fi
         tmp="$(mktemp -d)"
         if ! sums="$(curl -fsSL "$base/SHA256SUMS.natives" 2>/dev/null)"; then
             warn "$proj" "natives: no $repo $tag release to fetch (GDScript runs, slower)"; rm -rf "$tmp"; continue
@@ -1068,7 +1068,7 @@ content_links_for() {
     local gi; gi="$(gi_path "$1")"
     [ -f "$gi" ] || return 0
     local path src
-    # The source through canon: games may still name a legacy id (g2gfast-maps/maps, legacy id), which is airdrift-maps.
+    # The source through canon: games may still name a legacy id (airdrift-maps/maps, legacy id), which is airdrift-maps.
     while IFS=$'\t' read -r path src; do
         [ -n "$path" ] && printf '%s\t%s\n' "$path" "$(canon_path "$src")"
     done < <(awk '/^# bootstrap-link: /{src=$3; next} src!="" && /^\//{print $0 "\t" src} {src=""}' "$gi")
@@ -1088,14 +1088,14 @@ link_content() {
         path="${path#/}"; path="${path%/}"
         # The raw art stores (a maps repo's .stores) are in no repository: $GS_STORES_FROM (an
         # rsync source, a folder or the URL of a .tar) is where a checkout gets them.
-        # A store the fetcher finished has .dot-pack; one it was stopped in still has .manifest.json and is resumed.
-        if { [ ! -d "$PROJECTS_DIR/$src" ] || [ -f "$PROJECTS_DIR/$src/.dot-pack" ] || [ -f "$PROJECTS_DIR/$src/.manifest.json" ]; } && [ "${src##*/}" = ".stores" ] && [ -z "$STORES_USER_SET" ] && [ "$GS_STORES_FROM" != none ] \
+        # A store the fetcher finished has .gs-pack; one it was stopped in still has .manifest.json and is resumed.
+        if { [ ! -d "$PROJECTS_DIR/$src" ] || [ -f "$PROJECTS_DIR/$src/.gs-pack" ] || [ -f "$PROJECTS_DIR/$src/.manifest.json" ]; } && [ "${src##*/}" = ".stores" ] && [ -z "$STORES_USER_SET" ] && [ "$GS_STORES_FROM" != none ] \
                 && lock_lists_stores "$PROJECTS_DIR/${src%%/*}/content.lock.json" && [ -x "$REPO_DIR/tools/fetch_lock.sh" ]; then
             "$REPO_DIR/tools/fetch_lock.sh" "$PROJECTS_DIR/${src%%/*}/content.lock.json" --only .stores \
                 && touch "$PROJECTS_DIR/$src/.gdignore" || warn "$proj" "fetching $src from content.lock.json failed"
         elif [ ! -d "$PROJECTS_DIR/$src" ] && [ "${src##*/}" = ".stores" ] && [ -d "$PROJECTS_DIR/${src%%/*}" ] \
-                && [ -n "${GS_STORES_FROM:-${DOT_STORES_FROM:-}}" ] && [ "$GS_STORES_FROM" != none ] && [ -x "$PROJECTS_DIR/dot-map-convert/tools/stage_stores.sh" ]; then
-            "$PROJECTS_DIR/dot-map-convert/tools/stage_stores.sh" "$PROJECTS_DIR/${src%%/*}" || warn "$proj" "staging $src from $GS_STORES_FROM failed"
+                && [ -n "${GS_STORES_FROM:-}" ] && [ "$GS_STORES_FROM" != none ] && [ -x "$PROJECTS_DIR/gs-map-convert/tools/stage_stores.sh" ]; then
+            "$PROJECTS_DIR/gs-map-convert/tools/stage_stores.sh" "$PROJECTS_DIR/${src%%/*}" || warn "$proj" "staging $src from $GS_STORES_FROM failed"
         elif [ "${src##*/}" != ".stores" ] && [ "$src" != "${src%%/*}" ] && [ -f "$PROJECTS_DIR/${src%%/*}/content.lock.json" ] \
                 && [ -x "$REPO_DIR/tools/fetch_lock.sh" ]; then
             # Content kept out of git (fc-dm-maps' maps) is pinned in the repo's lock under the linked folder.
@@ -1104,7 +1104,7 @@ link_content() {
         fi
         if [ ! -d "$PROJECTS_DIR/$src" ]; then
             if [ "${src##*/}" = ".stores" ]; then
-                warn "$proj" "art stores missing: $src is in no repository, so maps draw low-detail art. Run again without --no-stores, or set GS_STORES_FROM (rsync source, folder or .tar URL of the pbr-library and model-library) and run bootstrap again, or run dot-map-convert/tools/stage_stores.sh ${src%%/*} --from <src> --game $proj"
+                warn "$proj" "art stores missing: $src is in no repository, so maps draw low-detail art. Run again without --no-stores, or set GS_STORES_FROM (rsync source, folder or .tar URL of the pbr-library and model-library) and run bootstrap again, or run gs-map-convert/tools/stage_stores.sh ${src%%/*} --from <src> --game $proj"
             else
                 warn "$proj" "content missing: $src (clone ${src%%/*} for $path)"
             fi
@@ -1382,7 +1382,7 @@ get_export_templates() {
     dest="$SELF_DIR/.godot-bin/$tag/templates"
     if [ -s "$dest/$main" ]; then echo "templates $tag already in $dest" >&2; echo "$dest/$main"; return 0; fi
     asset="Godot_v${tag}_export_templates.tpz"
-    base="${GS_GODOT_BASE:-${DOT_GODOT_BASE:-https://github.com/godotengine/godot-builds/releases/download}}/$tag"
+    base="${GS_GODOT_BASE:-https://github.com/godotengine/godot-builds/releases/download}/$tag"
     mkdir -p "$dest" || return 1
     # Beside the destination, not in /tmp: the archive is 1.2 GB and /tmp is often memory.
     tpz="$dest/$asset.part"; unpack="$dest/unpack.part"
@@ -1427,8 +1427,8 @@ advanced_options=false
 dedicated_server=false
 custom_features=""
 export_filter="all_resources"
-include_filter="*.json, *.bin, *.yml, *.txt, *.tsv, *.conf, *.cfg, *.dot-pack"
-exclude_filter="examples/*, tests/*, tools/*, ci/*, docs/*, images/*, build/*, screenshots/*, lightbake_work/*, dot_cloud/*, web/build/*, export_presets*.cfg"
+include_filter="*.json, *.bin, *.yml, *.txt, *.tsv, *.conf, *.cfg, *.gs-pack"
+exclude_filter="examples/*, tests/*, tools/*, ci/*, docs/*, images/*, build/*, screenshots/*, lightbake_work/*, gs_cloud/*, web/build/*, export_presets*.cfg"
 export_path="$path"
 encryption_include_filters=""
 encryption_exclude_filters=""
@@ -1534,7 +1534,7 @@ export_natives() {
 }
 
 # A library an addon loads itself at run time from a .cfg (GameSpice Net's snapshot core:
-# addons/dot_net/native/dot_net_native.cfg, see its docs/native.md). The export never
+# addons/gs_net/native/gs_net_native.cfg, see its docs/native.md). The export never
 # carries it, so export_game copies the .cfg and its release library into
 # <out>/<cfg name>/, the place GSNetNative looks beside the executable. One line per
 # addons/*/native/*.cfg holding an entry_symbol: "<cfg>\t<library path relative to the
@@ -1586,7 +1586,7 @@ export_game() {
         [ -n "$ext" ] || continue
         [ -n "$lib" ] || { echo "${RED}$ext lists no Linux x86_64 library, so the build would run without it. Run ./bootstrap.sh $proj to fetch it (GS_NATIVES=none exports without).${OFF}" >&2; missing=1; }
     done <<< "$(export_natives "$dir" linux)"
-    [ "$missing" = 0 ] || [ "${GS_NATIVES:-${DOT_NATIVES:-}}" = none ] || return 1
+    [ "$missing" = 0 ] || [ "${GS_NATIVES:-}" = none ] || return 1
 
     exe="$(export_path "$proj")"; out="$(dirname "$exe")"; log="$out/export.log"
     mkdir -p "$out" || return 1
@@ -1649,7 +1649,7 @@ play_export() {
 # the mode is read.
 ARGS=()
 GET_GODOT=0; DO_IMPORT=0
-only_raw="${GS_ONLY:-${DOT_ONLY:-}}"
+only_raw="${GS_ONLY:-}"
 games_raw=""; addons_raw=""; positional=""
 # The raw art stores are fetched once from the maps repo's content.lock.json (tools/fetch_lock.sh) unless GS_STORES_FROM
 # says otherwise (a folder, rsync source or .tar URL) or it is "none" (--no-stores); a finished .stores is never refetched.
@@ -1731,7 +1731,7 @@ content_keys() {
     # GameSpice Cloud refuses unsigned manifests, and it should: a mounted pack can contain
     # scripts, so a client that mounts unsigned content runs whatever the server sent.
     # That means publishing needs a private key, and a private key is the one thing a
-    # clone can never carry -- `keys/` is gitignored in dot-server-deploy precisely so
+    # clone can never carry -- `keys/` is gitignored in gs-server-deploy precisely so
     # it cannot arrive in a commit.
     #
     # So a fresh clone can CONSUME the team's content (the public half is committed in
@@ -1740,9 +1740,9 @@ content_keys() {
     # show as a local modification to a committed file. That is the honest trade and the
     # reason this is opt-in rather than part of a plain sync: overwriting it silently
     # would leave somebody wondering why their client rejects the team's packs.
-    local deploy="$PROJECTS_DIR/dot-server-deploy"
+    local deploy="$PROJECTS_DIR/gs-server-deploy"
 
-    [ -d "$deploy" ] || { warn "dot-server-deploy" "not cloned yet; run a sync first"; return 1; }
+    [ -d "$deploy" ] || { warn "gs-server-deploy" "not cloned yet; run a sync first"; return 1; }
 
     # The rewrite of client/content.json below is Python, because editing JSON in
     # sed is how a config file gets corrupted. Check for it up front: without this
@@ -1758,7 +1758,7 @@ content_keys() {
     else
         mkdir -p "$deploy/keys"
         ( cd "$deploy" && "$godot" --headless --path . \
-            --script addons/dot_cloud/publish/dot_cloud_cli.gd -- \
+            --script addons/gs_cloud/publish/gs_cloud_cli.gd -- \
             keygen --private keys/content.key --public keys/content.pub >/dev/null 2>&1 ) \
             || { warn "content keys" "keygen failed"; return 1; }
         # The generator warns it lands with default permissions, and it is right to.
@@ -1785,14 +1785,14 @@ PY
 FASTGMAD_VERSION="0.2.1"
 install_tools() {
     # fastgmad, the community addon-archive (.gma) extractor that GameSpice Map Convert's BSP importer
-    # (dotbsp/gma.py in GameSpice Map Convert) shells out to. Opt-in rather than part of a plain sync,
+    # (gsbsp/gma.py in GameSpice Map Convert) shells out to. Opt-in rather than part of a plain sync,
     # because a plain sync needs git and nothing else, and this is a download of a binary.
     # Pinned to one release and refused unless its SHA-256 matches the value below, which
     # was checked against the release's own digest: the importer runs this on archives
     # from the internet, so the binary itself must not be whatever a mirror served.
     # The release ships helper libraries beside the executable, so all of it is installed
     # into one directory and only the executable is linked into the bin directory.
-    local prefix="${GS_TOOLS_PREFIX:-${DOT_TOOLS_PREFIX:-$HOME/.local}}" os arch asset sum
+    local prefix="${GS_TOOLS_PREFIX:-$HOME/.local}" os arch asset sum
     os="$(uname -s)"; arch="$(uname -m)"
     case "$os-$arch" in
         Linux-x86_64)  asset=fastgmad_linux.zip;
@@ -1809,8 +1809,8 @@ install_tools() {
     tmp="$(mktemp -d)" || return 1
     # GS_FASTGMAD_ZIP names a local copy of the release zip (an offline machine). It is
     # held to the same checksum.
-    if [ -n "${GS_FASTGMAD_ZIP:-${DOT_FASTGMAD_ZIP:-}}" ]; then
-        cp "${GS_FASTGMAD_ZIP:-${DOT_FASTGMAD_ZIP:-}}" "$tmp/$asset" || { rm -rf "$tmp"; return 1; }
+    if [ -n "${GS_FASTGMAD_ZIP:-}" ]; then
+        cp "${GS_FASTGMAD_ZIP:-}" "$tmp/$asset" || { rm -rf "$tmp"; return 1; }
     else
         curl -fsSL -o "$tmp/$asset" \
             "https://github.com/WilliamVenner/fastgmad/releases/download/v$FASTGMAD_VERSION/$asset" \
@@ -1921,7 +1921,7 @@ case "$mode" in
         while read -r p; do [ -n "$p" ] && fetch_natives "$p"; done <<< "$targets"
         while read -r p; do [ -n "$p" ] && { link_addons "$p"; link_content "$p"; }; done <<< "$targets"
         # Valve-origin pre-commit hook in every repository (GS_CLOUD names the guard checkout).
-        # Loud on failure, never skipped: no dot-cloud clone means no guard, and that is an error.
+        # Loud on failure, never skipped: no gs-cloud clone means no guard, and that is an error.
         "$SELF_DIR/tools/install-valve-hooks.sh" "$PROJECTS_DIR" || err "valve hooks" "not installed everywhere (see above)"
         [ "$DO_IMPORT" = "1" ] && run_import
         ;;

@@ -1,9 +1,9 @@
 """One display-name function for every addon. Repo slugs, code identifiers, install paths and addons.lock names stay
-"dot-*"; only visible text (banner title and alt text, README headings, asset titles) uses the display name.
+"gs-*"; only visible text (banner title and alt text, README headings, asset titles) uses the display name.
 
-  dot-npc-ai-director -> "NPC AI Director"     dot-peer-to-peer -> "Peer-to-Peer"     dot-2d -> "2D"
+  gs-npc-ai-director -> "NPC AI Director"     gs-peer-to-peer -> "Peer-to-Peer"     gs-2d -> "2D"
 
-  python3 display_name.py dot-cloud [...]      print display names
+  python3 display_name.py gs-cloud [...]      print display names
 """
 import sys
 
@@ -13,7 +13,7 @@ SPECIAL = {"peer-to-peer": "Peer-to-Peer"}
 
 
 def display_name(slug):
-    s = slug[4:] if slug.startswith("dot-") else slug
+    s = slug[4:] if slug.startswith("gs-") else slug
     if s in SPECIAL:
         return SPECIAL[s]
     return " ".join(ACRONYMS.get(w, w.capitalize()) for w in s.split("-") if w)

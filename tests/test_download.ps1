@@ -2,7 +2,7 @@
 $ErrorActionPreference = 'Stop'
 $pass = 0; $fail = 0
 function Check ($name, $cond) { if ($cond) { $script:pass++ } else { $script:fail++; Write-Host "FAIL: $name" } }
-. "$env:H/tools/dot_download.ps1"
+. "$env:H/tools/gs_download.ps1"
 $env:GS_PROGRESS_SECONDS = '0'
 $T = $env:T; $U = $env:U
 $big = [IO.File]::ReadAllBytes("$T/cdn/big")
@@ -45,7 +45,7 @@ Check 'header line' ($out -match 'fetching o/zz-alpha 1\.0\.0: 3 files, 0\.3 MB'
 Check 'file i/n line' ($out -match 'o/zz-alpha\s+file [123]/3  [\d.]+ / 0\.3 MB')
 Check 'hash mismatch retried' ($out -match 'retry .*hash mismatch')
 Check 'files there' ((Get-Content -Raw "$T/repo/.alpha/flaky.txt") -eq 'flaky data' -and (Get-Item "$T/repo/.alpha/a.txt").Length -eq 300000 -and (Test-Path "$T/repo/.alpha/sub/b.txt"))
-Check 'stamped, manifest gone' ((Test-Path "$T/repo/.alpha/.dot-pack") -and -not (Test-Path "$T/repo/.alpha/.manifest.json"))
+Check 'stamped, manifest gone' ((Test-Path "$T/repo/.alpha/.gs-pack") -and -not (Test-Path "$T/repo/.alpha/.manifest.json"))
 Check 'no part left' (-not (Get-ChildItem -Recurse "$T/repo/.alpha" -Filter '*.part'))
 $out2 = & pwsh -NoProfile -NonInteractive -File "$env:H/tools/fetch_lock.ps1" "$T/repo/content.lock.json" -Cdn $U 2>&1 | Out-String
 Check 'second run has it' ($out2 -match 'have o/zz-alpha 1\.0\.0')

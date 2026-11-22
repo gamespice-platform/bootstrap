@@ -24,7 +24,7 @@
         .\bootstrap.ps1 -GetGodot               download the latest stable Godot into .godot-bin beside this script, then carry on (sync, and -Import if given); every mode that runs Godot looks there
         .\bootstrap.ps1 -DiscardGenerated       when an update is blocked, restore every modified .import/.uid file and retry
         .\bootstrap.ps1 game-fatal-contact mg-wipeout  the same as -Only (names, short forms, wildcards)
-        .\bootstrap.ps1 -Games fc,wipeout -Addons dot-core   games and/or addons by kind
+        .\bootstrap.ps1 -Games fc,wipeout -Addons gs-core   games and/or addons by kind
         .\bootstrap.ps1 zees-games             every game, with the addons and content it needs
         .\bootstrap.ps1 -ZeesGamesMin          every game, base repository + addons only
         .\bootstrap.ps1 mg-wipeout -Min        -Min: no maps, weapon, monster or other content packs
@@ -32,7 +32,7 @@
 
     -Only works with every mode (sync, -Links, -Status). A name is a project
     from projects.tsv, or its short form (fc = game-fatal-contact, wipeout =
-    mg-wipeout, core = dot-core), or another name projects.tsv lists for it
+    mg-wipeout, core = gs-core), or another name projects.tsv lists for it
     (fatal-contact and final-contact = game-fatal-contact, airdrift = game-airdrift,
     playlot = game-playlot), or a wildcard. Set $env:GS_ONLY to make a
     selection stick. Addons are copied (or linked) into the named projects only.
@@ -72,8 +72,8 @@
 
     The failure this avoids is worth naming, because it does not look like a
     link problem. If Git checks a symlink out as a regular file -- which is what
-    it does when core.symlinks is false -- then addons\dot_core is a ~30 byte
-    text file containing "../../dot-core/addons/dot_core". Godot loads it, finds
+    it does when core.symlinks is false -- then addons\gs_core is a ~30 byte
+    text file containing "../../gs-core/addons/gs_core". Godot loads it, finds
     no scripts, and every class_name the addon defines fails to resolve. In
     GDScript a script that merely MENTIONS an unknown class_name fails to parse,
     and takes every script referencing it down too, so the symptom is dozens of
@@ -90,9 +90,9 @@
 
 [CmdletBinding()]
 param(
-    [string]$Projects = $(if ($env:GS_PROJECTS) { $env:GS_PROJECTS } elseif ($env:DOT_PROJECTS) { $env:DOT_PROJECTS } else { '' }),
-    [string]$GitBase  = $(if ($env:GS_GIT_BASE) { $env:GS_GIT_BASE } elseif ($env:DOT_GIT_BASE) { $env:DOT_GIT_BASE } else { 'git@github.com:gamespice-platform' }),
-    [string]$Hub      = $(if ($env:DOTHUB) { $env:DOTHUB } else { '' }),
+    [string]$Projects = $(if ($env:GS_PROJECTS) { $env:GS_PROJECTS } elseif ($env:GS_PROJECTS) { $env:GS_PROJECTS } else { '' }),
+    [string]$GitBase  = $(if ($env:GS_GIT_BASE) { $env:GS_GIT_BASE } elseif ($env:GS_GIT_BASE) { $env:GS_GIT_BASE } else { 'git@github.com:gamespice-platform' }),
+    [string]$Hub      = $(if ($env:GSHUB) { $env:GSHUB } else { '' }),
     [switch]$Links,
     [switch]$ContentKeys,
     [switch]$Tools,
@@ -103,7 +103,7 @@ param(
     [switch]$Junction,
     [switch]$Https,
     [switch]$Ssh,
-    [string[]]$Only = $(if ($env:GS_ONLY) { $env:GS_ONLY -split '[,\s]+' } elseif ($env:DOT_ONLY) { $env:DOT_ONLY -split '[,\s]+' } else { @() }),
+    [string[]]$Only = $(if ($env:GS_ONLY) { $env:GS_ONLY -split '[,\s]+' } elseif ($env:GS_ONLY) { $env:GS_ONLY -split '[,\s]+' } else { @() }),
     [switch]$NoDeps,
     [int]$Jobs = [Environment]::ProcessorCount,
     [switch]$NoStores,
@@ -123,14 +123,13 @@ param(
     [string[]]$Names = @()
 )
 # Never PowerShell's progress bar: on 5.1 it slows Invoke-WebRequest (and Expand-Archive) to a crawl. Downloads go through
-# tools\dot_download.ps1 (Invoke-GSDownload), which prints our own progress line: MB done / total, MB/s, ETA.
+# tools\gs_download.ps1 (Invoke-GSDownload), which prints our own progress line: MB done / total, MB/s, ETA.
 $ProgressPreference = 'SilentlyContinue'
 
 $ErrorActionPreference = 'Continue'
-foreach ($e in Get-ChildItem env:DOT_*) { $g = 'GS_' + $e.Name.Substring(4); if (-not (Test-Path "env:$g")) { Set-Item "env:$g" $e.Value; if (-not $env:GS_QUIET_DEPRECATION) { [Console]::Error.WriteLine("WARN: $($e.Name) is deprecated, use $g") } } }  # old DOT_* names still work
 $repoDir = $PSScriptRoot
-$dotDownload = Join-Path $repoDir 'tools\dot_download.ps1'
-. $dotDownload
+$gsDownload = Join-Path $repoDir 'tools\gs_download.ps1'
+. $gsDownload
 $script:failed = $false
 $script:junctionFailures = 0
 $script:linksMade = 0
@@ -206,10 +205,10 @@ elseif (Test-Path (Join-Path $repoDir 'godot')) {
     # Sitting at a game-dev tree root.
     $projectsDir = Join-Path $repoDir 'godot'
 }
-elseif ((Split-Path $repoDir -Leaf) -in @('dot-bootstrap', 'bootstrap') -and
+elseif ((Split-Path $repoDir -Leaf) -in @('gs-bootstrap', 'bootstrap') -and
         (Split-Path (Split-Path $repoDir -Parent) -Leaf) -eq 'godot' -and
         (Test-Path (Join-Path (Split-Path (Split-Path $repoDir -Parent) -Parent) 'CLAUDE.md'))) {
-    # This repository is itself a project directory: <tree>\godot\dot-bootstrap.
+    # This repository is itself a project directory: <tree>\godot\gs-bootstrap.
     #
     # Both leaf names, because this repository was renamed from `bootstrap` and a
     # clone made before that is still a correct clone. A name test that only knows
@@ -218,7 +217,7 @@ elseif ((Split-Path $repoDir -Leaf) -in @('dot-bootstrap', 'bootstrap') -and
     #
     # All THREE conditions, because the obvious one-condition version of this
     # test -- "is my parent called godot" -- silently ate a real setup. A clone
-    # at F:\Godot\tmc-dot-bootstrap has a parent whose leaf is "Godot", and
+    # at F:\Godot\tmc-gs-bootstrap has a parent whose leaf is "Godot", and
     # PowerShell's -eq is case-INSENSITIVE, so it matched: everything was cloned
     # to F:\Godot as siblings of this repository instead of into .\projects, and
     # the only sign was one line of output nobody had a reason to read.
@@ -298,8 +297,8 @@ function Get-OnDiskPath ($p) {
 }
 
 # The addons a project needs linked in, read out of its own .gitignore. A
-# project's own addon is never in there -- GameSpice Net ignores dot_core and ships
-# dot_net -- which is exactly the distinction wanted. A bare "/addons/" means
+# project's own addon is never in there -- GameSpice Net ignores gs_core and ships
+# gs_net -- which is exactly the distinction wanted. A bare "/addons/" means
 # "ignore the lot" (GameSpice Server Deploy vendors its own with setup.sh) and
 # names nothing to link.
 function Get-LinksFor ($proj) {
@@ -342,7 +341,7 @@ $legacyAddonDirs = @{ 'arena_weapons' = 'fc_weapons' }
 $renamedAddonDirs = @{ 'arena_weapons' = 'fc_weapons'; 'fc_weapons' = 'arena_weapons' }
 
 # Which repository an addon comes from. bootstrap.sh's addon_source has the reasoning:
-# the name rule misses a game's own pack (zee_weapons is in zee-dot-weapons), so ask the
+# the name rule misses a game's own pack (zee_weapons is in zee-gs-weapons), so ask the
 # checkouts for the project that has the folder and does not ignore it.
 function Get-AddonSource ($addon) {
     $src = $addon -replace '_', '-'
@@ -354,7 +353,7 @@ function Get-AddonSource ($addon) {
         # An old-name junction left by a rename is not a second owner.
         if ($d.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
         if (-not (Test-Path (Join-Path $d.FullName "addons\$addon")) -or -not (Test-Path (Join-Path $d.FullName '.git'))) { continue }
-        # Git's own answer, not a line match: dot-server-deploy ignores /addons/ whole.
+        # Git's own answer, not a line match: gs-server-deploy ignores /addons/ whole.
         git -C $d.FullName check-ignore -q "addons/$addon" 2>$null
         if ($LASTEXITCODE -eq 0) { continue }
         return $d.Name
@@ -373,24 +372,24 @@ function Test-Listed ($name) { [bool](Get-Projects | Where-Object { $_.Name -eq 
 # A name as typed -> the projects it means, or nothing.
 function Resolve-Name ($n) {
     if ($n -in @('zees-games', 'games')) { return @(Get-Games | ForEach-Object { $_.Name }) }
-    if ($n -eq 'addons') { return @(Get-Projects | Where-Object { $_.Name -like 'dot-*' } | ForEach-Object { $_.Name }) }
+    if ($n -eq 'addons') { return @(Get-Projects | Where-Object { $_.Name -like 'gs-*' } | ForEach-Object { $_.Name }) }
     if ($n -match '[*?\[]') { return @(Get-Projects | Where-Object { $_.Name -like $n } | ForEach-Object { $_.Name }) }
-    foreach ($p in @($n, "game-$n", "mg-$n", "dot-$n")) { if (Test-Listed $p) { return @($p) } }
+    foreach ($p in @($n, "game-$n", "mg-$n", "gs-$n")) { if (Test-Listed $p) { return @($p) } }
     $a = Get-AliasTarget $n
     if ($a) { return @($a) }
     return @()
 }
 
 # The listed repository an addon comes from, clone or no clone: the name rule, then a
-# checkout that owns it, then the listed name it matches with every "dot-" taken out
-# (zee_weapons is zee-dot-weapons; no two names in projects.tsv are equal that way).
+# checkout that owns it, then the listed name it matches with every "gs-" taken out
+# (zee_weapons is zee-gs-weapons; no two names in projects.tsv are equal that way).
 function Get-AddonRepo ($addon) {
     $src = Get-Canon ($addon -replace '_', '-')
     if (Test-Listed $src) { return $src }
     $owner = Get-AddonSource $addon
     if ((Test-Listed $owner) -and (Test-Path (Join-Path $projectsDir "$owner\addons\$addon"))) { return $owner }
-    $bare = $src -replace 'dot-', ''
-    foreach ($p in Get-Projects) { if (($p.Name -replace 'dot-', '') -eq $bare) { return $p.Name } }
+    $bare = $src -replace 'gs-', ''
+    foreach ($p in Get-Projects) { if (($p.Name -replace 'gs-', '') -eq $bare) { return $p.Name } }
     return $null
 }
 
@@ -1098,7 +1097,7 @@ function Link-Addons ($proj) {
 }
 
 # A native library an addon can load ("# bootstrap-natives: GameSpice Sim v0.1.0" above
-# /addons/dot_sim in the game's .gitignore). bootstrap.sh's fetch_natives has the
+# /addons/gs_sim in the game's .gitignore). bootstrap.sh's fetch_natives has the
 # reasoning: the release's zip for this machine, checksum checked, unpacked at the addon
 # repository's root before the links (so a copy carries it), a stamp to skip it next
 # time, a local build kept, and a warning (GDScript runs) when there is none.
@@ -1120,7 +1119,7 @@ function Get-NativesFor ($proj) {
     }
 }
 
-# True when $libDir already holds a library for $plat: a non-empty $plat folder (dot-sim)
+# True when $libDir already holds a library for $plat: a non-empty $plat folder (gs-sim)
 # or a Godot-named file such as libx.windows.template_release.x86_64.dll (GameSpice Net).
 function Test-NativeBuiltHere ($libDir, $plat) {
     $platDir = Join-Path $libDir $plat
@@ -1165,7 +1164,7 @@ function Fetch-Natives ($proj) {
             Say $proj "natives: keeps the $($n.Addon) library built here ($plat)" 'DarkGray'; continue
         }
         # The organisation names its repositories without the dot- prefix; a named base keeps the directory name.
-        $repoName = if ($env:GS_NATIVES_BASE) { $n.Repo } else { $n.Repo -replace '^dot-', '' }
+        $repoName = if ($env:GS_NATIVES_BASE) { $n.Repo } else { $n.Repo -replace '^gs-', '' }
         $base = "$root/$repoName/releases/download/$($n.Tag)"
         try { $sums = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri "$base/SHA256SUMS.natives").Content }
         catch { Warn $proj "natives: no $($n.Repo) $($n.Tag) release to fetch (GDScript runs, slower)"; continue }
@@ -1216,10 +1215,10 @@ function Link-Content ($proj) {
             $from = if ($env:GS_STORES_FROM) { $env:GS_STORES_FROM } else { 'none' }
             $lockFile = Join-Path $projectsDir (($src -split '/')[0] + '\content.lock.json')
             $fetcher = Join-Path $repoDir 'tools\fetch_lock.ps1'
-            # A store the fetcher has finished has .dot-pack; one it was stopped in still has its .manifest.json and is
+            # A store the fetcher has finished has .gs-pack; one it was stopped in still has its .manifest.json and is
             # resumed (present files are skipped), not linked half-empty for good.
             if ((($src -split '/')[-1] -eq '.stores') -and -not $NoStores -and -not $env:GS_STORES_FROM -and (Test-Path $lockFile) -and ((Get-Content $lockFile -Raw) -match '"into"\s*:\s*"\.stores"') -and (Test-Path $fetcher) `
-                    -and (-not (Test-Path $target) -or (Test-Path (Join-Path $target '.dot-pack')) -or (Test-Path (Join-Path $target '.manifest.json')))) {
+                    -and (-not (Test-Path $target) -or (Test-Path (Join-Path $target '.gs-pack')) -or (Test-Path (Join-Path $target '.manifest.json')))) {
                 & $fetcher $lockFile -Only '.stores'
                 if ($LASTEXITCODE -ne 0) { Warn $proj "fetching $src from content.lock.json failed" }
                 elseif (Test-Path $target) { New-Item -ItemType File -Force -Path (Join-Path $target '.gdignore') | Out-Null }
@@ -1227,7 +1226,7 @@ function Link-Content ($proj) {
                     -and (Test-Path (Join-Path $projectsDir ($src -split '/')[0]))) {
                 New-Item -ItemType Directory -Force -Path $target | Out-Null
                 if ($from -match '^https?://') {
-                    $tar = Join-Path ([IO.Path]::GetTempPath()) 'dot-stores.tar'
+                    $tar = Join-Path ([IO.Path]::GetTempPath()) 'gs-stores.tar'
                     Say $proj "downloading the art stores (a .tar, once) from $from"
                     try { Invoke-GSDownload $from $tar -Name $proj; tar -xf $tar -C $target }
                     catch { Warn $proj "could not download the art stores from ${from}: $($_.Exception.Message)" }
@@ -1299,7 +1298,7 @@ function Link-Many ($targets) {
     $iss = [initialsessionstate]::CreateDefault()
     $me = $PSCommandPath
     foreach ($f in Get-ChildItem function:) {
-        if (($f.ScriptBlock.File -eq $me -or $f.ScriptBlock.File -eq $dotDownload) -and $f.Name -notin @('Say', 'Warn', 'Err', 'Ok')) {
+        if (($f.ScriptBlock.File -eq $me -or $f.ScriptBlock.File -eq $gsDownload) -and $f.Name -notin @('Say', 'Warn', 'Err', 'Ok')) {
             $iss.Commands.Add((New-Object System.Management.Automation.Runspaces.SessionStateFunctionEntry($f.Name, $f.Definition)))
         }
     }
@@ -1429,7 +1428,7 @@ function Find-Godot {
         "$env:ProgramFiles\Godot",
         "$env:USERPROFILE\scoop\apps\godot\current",
         'C:\Godot',
-        # Next to this clone (F:\Godot\tmc-dot-bootstrap -> F:\Godot), and the usual download places.
+        # Next to this clone (F:\Godot\tmc-gs-bootstrap -> F:\Godot), and the usual download places.
         (Split-Path $repoDir -Parent),
         "$env:USERPROFILE\Downloads",
         "$env:USERPROFILE\Desktop"
@@ -1631,8 +1630,8 @@ function Get-DefaultExportPreset ($proj, $preset, $idx) {
     @("[preset.$idx]", '', "name=`"$preset`"", "platform=`"$platform`"", 'runnable=true',
         'advanced_options=false', 'dedicated_server=false', 'custom_features=""',
         'export_filter="all_resources"',
-        'include_filter="*.json, *.bin, *.yml, *.txt, *.tsv, *.conf, *.cfg, *.dot-pack"',
-        'exclude_filter="examples/*, tests/*, tools/*, ci/*, docs/*, images/*, build/*, screenshots/*, lightbake_work/*, dot_cloud/*, web/build/*, export_presets*.cfg"',
+        'include_filter="*.json, *.bin, *.yml, *.txt, *.tsv, *.conf, *.cfg, *.gs-pack"',
+        'exclude_filter="examples/*, tests/*, tools/*, ci/*, docs/*, images/*, build/*, screenshots/*, lightbake_work/*, gs_cloud/*, web/build/*, export_presets*.cfg"',
         "export_path=`"$path`"", 'encryption_include_filters=""', 'encryption_exclude_filters=""',
         'seed=0', 'encrypt_pck=false', 'encrypt_directory=false', 'script_export_mode=2', '',
         "[preset.$idx.options]", '', 'custom_template/debug=""', 'custom_template/release=""',
@@ -1727,7 +1726,7 @@ function Get-ExportNatives ($dir, $os) {
 }
 
 # A library an addon loads itself at run time from a .cfg (GameSpice Net's snapshot core,
-# addons\dot_net\native\dot_net_native.cfg). The export never carries it, so Export-Game
+# addons\gs_net\native\gs_net_native.cfg). The export never carries it, so Export-Game
 # copies the .cfg and its release library into <out>\<cfg name>\, where GSNetNative
 # looks beside the executable. One object per addons\*\native\*.cfg holding an
 # entry_symbol, with Cfg (full path) and Lib (relative to the cfg; empty when it names
@@ -1882,7 +1881,7 @@ function Play-Export ($want) {
 # GameSpice Cloud refuses unsigned manifests, and it should: a mounted pack can contain
 # scripts, so a client that mounts unsigned content runs whatever the server sent.
 # That means publishing needs a private key, and a private key is the one thing a
-# clone can never carry -- keys\ is gitignored in dot-server-deploy precisely so it
+# clone can never carry -- keys\ is gitignored in gs-server-deploy precisely so it
 # cannot arrive in a commit.
 #
 # So a fresh clone can CONSUME the team's content (the public half is committed in
@@ -1895,7 +1894,7 @@ function Play-Export ($want) {
 # out to. Opt-in for the same reason as -ContentKeys: a plain sync needs git and nothing
 # else. Pinned to one release and refused unless its SHA-256 matches. Installed under
 # %LOCALAPPDATA%\fastgmad\<version> with the helper DLLs beside it; add that folder to PATH
-# or set DOTBSP_FASTGMAD to the exe (dotbsp does not look there on its own).
+# or set GSBSP_FASTGMAD to the exe (gsbsp does not look there on its own).
 function Install-Tools {
     $ver = '0.2.1'
     $sum = 'f093eebeffd0871513042a49ecda5a0d2902e278225679ac857a583cfb6e2d9f'
@@ -1915,16 +1914,16 @@ function Install-Tools {
         if ($got -ne $sum) { Err 'fastgmad' "checksum mismatch (got $got); nothing installed"; return $false }
         New-Item -ItemType Directory -Force -Path $dest | Out-Null
         Expand-Archive -Force -Path $zip -DestinationPath $dest
-        Ok 'fastgmad' "$ver installed in $dest; put it on PATH or set DOTBSP_FASTGMAD"
+        Ok 'fastgmad' "$ver installed in $dest; put it on PATH or set GSBSP_FASTGMAD"
         return $true
     } catch { Err 'fastgmad' $_.Exception.Message; return $false }
     finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
 }
 
 function New-ContentKeys {
-    $deploy = Join-Path $projectsDir 'dot-server-deploy'
+    $deploy = Join-Path $projectsDir 'gs-server-deploy'
     if (-not (Test-Path $deploy)) {
-        Warn 'dot-server-deploy' 'not cloned yet; run a sync first'
+        Warn 'gs-server-deploy' 'not cloned yet; run a sync first'
         return $false
     }
 
@@ -1946,7 +1945,7 @@ function New-ContentKeys {
         Push-Location $deploy
         try {
             & $godot --headless --path . `
-                --script addons/dot_cloud/publish/dot_cloud_cli.gd -- `
+                --script addons/gs_cloud/publish/gs_cloud_cli.gd -- `
                 keygen --private keys/content.key --public keys/content.pub 2>&1 | Out-Null
         }
         finally { Pop-Location }

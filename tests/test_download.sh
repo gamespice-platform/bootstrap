@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local test of tools/dot_download.ps1 (Invoke-GSDownload: own progress lines, 404, stall timeout, Range resume) and
+# Local test of tools/gs_download.ps1 (Invoke-GSDownload: own progress lines, 404, stall timeout, Range resume) and
 # fetch_lock.ps1 on top of it (file i/n progress, hash-mismatch retry), against a python fixture server. Needs pwsh
 # (that half is skipped without it), and fetch_lock.sh's own progress and retry lines. No network. Run: tests/test_download.sh
 set -uo pipefail
@@ -65,7 +65,7 @@ grep -q 'fetching o/zz-alpha 1.0.0: 3 files, 0.3 MB' <<<"$out"; ok "sh header li
 grep -Eq 'o/zz-alpha +file [123]/3  [0-9.]+ / 0\.3 MB  [0-9.]+ MB/s  ETA ' <<<"$out"; ok "sh file i/n line" $?
 grep -q 'done 0.3 MB in' <<<"$out"; ok "sh done line" $?
 grep -q 'retry .*hash mismatch' <<<"$out"; ok "sh hash mismatch retried" $?
-[ "$(cat "$T/repo-sh/.alpha/flaky.txt" 2>/dev/null)" = "flaky data" ] && [ -f "$T/repo-sh/.alpha/.dot-pack" ]; ok "sh files there" $?
+[ "$(cat "$T/repo-sh/.alpha/flaky.txt" 2>/dev/null)" = "flaky data" ] && [ -f "$T/repo-sh/.alpha/.gs-pack" ]; ok "sh files there" $?
 [ "$fail" = 0 ] || echo "$out"
 echo "test_download (sh): $pass passed, $fail failed"
 

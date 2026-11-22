@@ -25,4 +25,4 @@ jobs:
             godot: false
             shell-command: 'bash -n bootstrap.sh && python3 -m py_compile tools/shadowed_methods.py && ./bootstrap.sh --check >/dev/null && ./bootstrap.sh --list >/dev/null'
         secrets:
-            DEPS_TOKEN: ${{ secrets.DOT_DEPS_TOKEN }}
+            DEPS_TOKEN: ${{ secrets.GS_DEPS_TOKEN }}

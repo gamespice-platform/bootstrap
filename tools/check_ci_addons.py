@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""List projects whose scripts use an addon dot-ci will not clone.
+"""List projects whose scripts use an addon gs-ci will not clone.
 
-dot-ci clones only `/addons/<name>` lines of .gitignore (or addons.lock). An addon
+gs-ci clones only `/addons/<name>` lines of .gitignore (or addons.lock). An addon
 ignored without the leading slash, or not listed, is missing in CI. Usage: check_ci_addons.py [godot-dir] [--all]
 (addon repos are skipped unless --all: their selftests use optional siblings on purpose)
 """
@@ -29,7 +29,7 @@ bad = 0
 for r in repos:
     base = f"{root}/{r}"
     if not os.path.exists(f"{base}/project.godot"): continue
-    if r.startswith("dot-") and not ALL: continue
+    if r.startswith("gs-") and not ALL: continue
     listed = set()
     gi = f"{base}/.gitignore"
     if os.path.exists(gi):

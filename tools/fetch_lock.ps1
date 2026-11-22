@@ -2,13 +2,12 @@
 #   .\tools\fetch_lock.ps1 <content.lock.json> [-Root DIR] [-From BASE] [-Cdn URL] [-Cfg DIR] [-Except a,b] [-Only a,b] [-Packs DIR] [-List]
 # Same behaviour as fetch_lock.sh, which documents the lock, the item names (id, name half, into, kind, repo; globs) and the cfg/content
 # rules. Where from, first set wins: -From, $env:GS_PACKS_FROM ('none' fetches nothing), -Cdn / $env:GS_CDN_URL, GS_CDN_URL in
-# dot-bootstrap\.env, the lock's origin and mirrors, https://content.gamespice.net. (-Skip is the older name of -Except.)
+# gs-bootstrap\.env, the lock's origin and mirrors, https://content.gamespice.net. (-Skip is the older name of -Except.)
 param([Parameter(Mandatory)][string]$Lock, [string]$Root, [string]$From, [string]$Cdn, [string]$Cfg, [string]$Packs,
       [Alias('Skip')][string[]]$Except = @(), [string[]]$Only = @(), [switch]$List)
 $ErrorActionPreference = 'Stop'
-foreach ($e in Get-ChildItem env:DOT_*) { $g = 'GS_' + $e.Name.Substring(4); if (-not (Test-Path "env:$g")) { Set-Item "env:$g" $e.Value; if (-not $env:GS_QUIET_DEPRECATION) { [Console]::Error.WriteLine("WARN: $($e.Name) is deprecated, use $g") } } }  # old DOT_* names still work
-$ProgressPreference = 'SilentlyContinue'  # never PowerShell's progress bar (it slows 5.1 to a crawl); dot_download.ps1 prints our own
-. (Join-Path $PSScriptRoot 'dot_download.ps1')
+$ProgressPreference = 'SilentlyContinue'  # never PowerShell's progress bar (it slows 5.1 to a crawl); gs_download.ps1 prints our own
+. (Join-Path $PSScriptRoot 'gs_download.ps1')
 if (-not (Test-Path $Lock)) { Write-Host "fetch_lock: no $Lock, nothing pinned"; exit 0 }
 $Lock = (Resolve-Path $Lock).Path
 $lockDir = Split-Path -Parent $Lock
@@ -139,7 +138,7 @@ foreach ($p in $doc.packs) {
     if ($why) { Write-Host "skip $($p.id) ($why)"; continue }
     $pre = "$($p.id)/$($p.version)"; $want = "$($p.id) $($p.version) $(Pin $p $bases[0])"
     $out = if ($kind -eq 'pack') { Join-Path $Packs $pre } else { Join-Path $Root $p.into }
-    $stamp = Join-Path $out '.dot-pack'
+    $stamp = Join-Path $out '.gs-pack'
     if ((Test-Path $stamp) -and ((Get-Content -Raw $stamp).Trim() -eq $want)) { Write-Host "have $($p.id) $($p.version)"; continue }
     try {
         $man = if ($kind -eq 'pack') { Join-Path $out 'manifest.json' } else { Join-Path $out '.manifest.json' }

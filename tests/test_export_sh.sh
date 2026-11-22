@@ -12,9 +12,9 @@ check() { if eval "$2"; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL
 bash -n "$H/bootstrap.sh"; check 'bootstrap.sh parses' "[ $? = 0 ]"
 RED=''; YLW=''; CYN=''; DIM=''; GRN=''; OFF=''
 SELF_DIR="$T/shboot"; PROJECTS_DIR="$T/proj"; mkdir -p "$SELF_DIR" "$PROJECTS_DIR"
-games() { printf '%s\n' game-arena mg-pong game-arena-maps; }
+games() { printf '%s\n' game-fatal-contact mg-pong game-fatal-contact-maps; }
 ok() { :; }
-alias_target() { case "$1" in fatal-contact) echo game-arena ;; game-arena) echo game-fatal-contact ;; esac; }
+alias_target() { case "$1" in fatal-contact|arena|game-arena) echo game-fatal-contact ;; esac; }
 block="$(sed -n '/^# --- Release export /,/^# --- Modes /p' "$H/bootstrap.sh")"
 check 'the export block is found' '[ -n "$block" ]'
 eval "$block"
@@ -26,8 +26,8 @@ for flag in '--export|--play-export) ARGS' '--list|--play|--export|--play-export
 done
 check 'the help shows both modes' '[ "$(sed -n 3,48p "$H/bootstrap.sh" | grep -c -- "--export fc\|--play-export fc")" = 2 ]'
 
-check 'game: short name' '[ "$(resolve_game arena)" = game-arena ]'
-check 'game: another name from projects.tsv' '[ "$(resolve_game fatal-contact)" = game-arena ]'
+check 'game: short name' '[ "$(resolve_game arena)" = game-fatal-contact ]'
+check 'game: another name from projects.tsv' '[ "$(resolve_game fatal-contact)" = game-fatal-contact ]'
 check 'game: full name' '[ "$(resolve_game mg-pong)" = mg-pong ]'
 check 'game: unknown is refused' '! resolve_game nothing >/dev/null'
 
@@ -113,37 +113,37 @@ check 'natives: no library for this platform is empty' '[ "$(printf "%s\n" "$out
 check 'natives: no addons folder is nothing' '[ -z "$(export_natives "$T/empty" linux)" ]'
 
 # A library an addon loads itself from a .cfg (GameSpice Net's) is copied beside the export by hand.
-r="$T/shr"; mkdir -p "$r/addons/dot_net/native/bin" "$r/addons/other/native" "$r/addons/plain/native"
-printf '[configuration]\nentry_symbol = "x_init"\n[libraries]\nlinux.debug.x86_64 = "bin/libn.linux.template_debug.x86_64.so"\nlinux.release.x86_64 = "bin/libn.linux.template_release.x86_64.so"\n' > "$r/addons/dot_net/native/dot_net_native.cfg"
-echo rel > "$r/addons/dot_net/native/bin/libn.linux.template_release.x86_64.so"
+r="$T/shr"; mkdir -p "$r/addons/gs_net/native/bin" "$r/addons/other/native" "$r/addons/plain/native"
+printf '[configuration]\nentry_symbol = "x_init"\n[libraries]\nlinux.debug.x86_64 = "bin/libn.linux.template_debug.x86_64.so"\nlinux.release.x86_64 = "bin/libn.linux.template_release.x86_64.so"\n' > "$r/addons/gs_net/native/gs_net_native.cfg"
+echo rel > "$r/addons/gs_net/native/bin/libn.linux.template_release.x86_64.so"
 printf '[configuration]\nentry_symbol = "o_init"\n[libraries]\nwindows.release.x86_64 = "bin/o.dll"\n' > "$r/addons/other/native/o.cfg"
 printf '[plugin]\nname="plain"\n' > "$r/addons/plain/native/plugin.cfg"
 out="$(export_runtime_natives "$r" linux)"
 check 'runtime natives: only cfgs with an entry_symbol' '[ "$(printf "%s\n" "$out" | wc -l)" = 2 ]'
-check 'runtime natives: the release library, path kept' '[ "$(printf "%s\n" "$out" | sed -n 1p)" = "$r/addons/dot_net/native/dot_net_native.cfg	bin/libn.linux.template_release.x86_64.so" ]'
+check 'runtime natives: the release library, path kept' '[ "$(printf "%s\n" "$out" | sed -n 1p)" = "$r/addons/gs_net/native/gs_net_native.cfg	bin/libn.linux.template_release.x86_64.so" ]'
 check 'runtime natives: none for this platform is empty' '[ "$(printf "%s\n" "$out" | sed -n 2p)" = "$r/addons/other/native/o.cfg	" ]'
 bo="$T/bout"; mkdir -p "$bo/o"; echo stale > "$bo/o/o.cfg"
 bundle_runtime_natives "$r" linux "$bo" 2>"$T/err"
-check 'runtime natives: the cfg goes into <out>/<cfg name>/' '[ -f "$bo/dot_net_native/dot_net_native.cfg" ]'
-check 'runtime natives: the library beside it at the cfg path' '[ "$(cat "$bo/dot_net_native/bin/libn.linux.template_release.x86_64.so" 2>/dev/null)" = rel ]'
-check 'runtime natives: the debug library is not copied' '[ ! -e "$bo/dot_net_native/bin/libn.linux.template_debug.x86_64.so" ]'
+check 'runtime natives: the cfg goes into <out>/<cfg name>/' '[ -f "$bo/gs_net_native/gs_net_native.cfg" ]'
+check 'runtime natives: the library beside it at the cfg path' '[ "$(cat "$bo/gs_net_native/bin/libn.linux.template_release.x86_64.so" 2>/dev/null)" = rel ]'
+check 'runtime natives: the debug library is not copied' '[ ! -e "$bo/gs_net_native/bin/libn.linux.template_debug.x86_64.so" ]'
 check 'runtime natives: a missing one warns and leaves nothing stale' '[ ! -e "$bo/o" ] && grep -q "o: no linux x86_64 library" "$T/err"'
 check 'runtime natives: the export bundles them' 'grep -q "bundle_runtime_natives \"\$dir\" linux \"\$out\"" "$H/bootstrap.sh"'
 
 # play_export: the build is started with the profiling arguments, the caller's last.
-mkdir -p "$PROJECTS_DIR/game-arena/build/linux"
-printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/ran"\n' "$T" > "$PROJECTS_DIR/game-arena/build/linux/game-arena.x86_64"
-chmod +x "$PROJECTS_DIR/game-arena/build/linux/game-arena.x86_64"
+mkdir -p "$PROJECTS_DIR/game-fatal-contact/build/linux"
+printf '#!/bin/sh\nprintf "%%s\\n" "$@" > "%s/ran"\n' "$T" > "$PROJECTS_DIR/game-fatal-contact/build/linux/game-fatal-contact.x86_64"
+chmod +x "$PROJECTS_DIR/game-fatal-contact/build/linux/game-fatal-contact.x86_64"
 (play_export arena +bot_quota 16 --map dm_atrium) >"$T/playout" 2>&1
 check 'play: the build ran with the defaults, then the caller'"'"'s' '[ "$(tr "\n" " " < "$T/ran")" = "-- --offline +bot_quota 8 +profiler_overlay 1 +profiler_record_seconds 60 +bot_quota 16 --map dm_atrium " ]'
-check 'play: says where the reports land' 'grep -q "app_userdata/game-arena/profiles" "$T/playout"'
-printf 'config_version=5\n[application]\nconfig/name="Fatal Contact"\nconfig/use_custom_user_dir=true\nconfig/custom_user_dir_name="game-fatal-contact"\n' > "$PROJECTS_DIR/game-arena/project.godot"
+check 'play: says where the reports land' 'grep -q "app_userdata/game-fatal-contact/profiles" "$T/playout"'
+printf 'config_version=5\n[application]\nconfig/name="Fatal Contact"\nconfig/use_custom_user_dir=true\nconfig/custom_user_dir_name="game-fatal-contact"\n' > "$PROJECTS_DIR/game-fatal-contact/project.godot"
 (play_export arena) >"$T/playout" 2>&1
 check 'play: a custom user folder is the one named' 'grep -q "/game-fatal-contact/profiles" "$T/playout"'
 mkdir -p "$PROJECTS_DIR/mg-pong"
 check 'user dir: config/name names the default folder' '[ "$(printf "[application]\nconfig/name=\"Zed\"\n" > "$PROJECTS_DIR/mg-pong/project.godot"; XDG_DATA_HOME=/d user_data_dir mg-pong)" = /d/godot/app_userdata/Zed ]'
-rm -f "$PROJECTS_DIR/game-arena/project.godot" "$PROJECTS_DIR/mg-pong/project.godot"
-mkdir -p "$PROJECTS_DIR/mg-pong/build/linux"; cp "$PROJECTS_DIR/game-arena/build/linux/game-arena.x86_64" "$PROJECTS_DIR/mg-pong/build/linux/mg-pong.x86_64"
+rm -f "$PROJECTS_DIR/game-fatal-contact/project.godot" "$PROJECTS_DIR/mg-pong/project.godot"
+mkdir -p "$PROJECTS_DIR/mg-pong/build/linux"; cp "$PROJECTS_DIR/game-fatal-contact/build/linux/game-fatal-contact.x86_64" "$PROJECTS_DIR/mg-pong/build/linux/mg-pong.x86_64"
 (play_export mg-pong --map x) >/dev/null 2>&1
 check 'play: any other game gets no FC arguments' '[ "$(tr "\n" " " < "$T/ran")" = "-- --offline --map x " ]'
 (play_export nothing) >/dev/null 2>&1

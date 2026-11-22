@@ -276,8 +276,8 @@ unresolved_links() {
 	( cd "${1%/}/" && { LC_ALL=C find -L . \( -path ./.git -o -path ./.godot -o -path ./screenshots \) -prune -o -type l -printf 'dangling: %p\n' 2>&1 >&3 | grep -i 'loop' | sed 's/^/loop: /'; } 3>&1 | head -20 ) || true
 }
 
-# Links that loop back into their own directory (addons/dot_sql/dot_sql -> .../addons/dot_sql, made by an `ln -s <dir>
-# addons/dot_x` run twice: the second run puts the link INSIDE the first link's target, i.e. inside the GameSpice SQL repo, so
+# Links that loop back into their own directory (addons/gs_sql/gs_sql -> .../addons/gs_sql, made by an `ln -s <dir>
+# addons/gs_x` run twice: the second run puts the link INSIDE the first link's target, i.e. inside the GameSpice SQL repo, so
 # every game linking GameSpice SQL carries it; zombie-zone-maps/maps/maps, 2026-11-13). --copy-links would follow it forever, and
 # nothing can read it as a file, so it is safe to leave out of the copy: one project-relative path per line, no leading "./".
 # Found from find's own "File system loop detected; 'X' is part of ..." notice (C locale, so ASCII quotes); only a real link
@@ -685,7 +685,7 @@ unwrap() {
 # Exit 1 unless the command is one a box can run from a copy of the project:
 #   [timeout N] ./game.sh [--no-parse] [--timeout N] test [suite...]        (UW_KIND=game)
 #   [timeout N] godot --headless --path . [--quit-after N] [-d] res://x.tscn | --script res://x.gd [-- args]   (UW_KIND=godot)
-# either may follow `env K=V` words (names that carry a secret, a path or this box's settings stay local); run from a project's own directory. Anything else may depend on dev02 (dot-server-deploy's
+# either may follow `env K=V` words (names that carry a secret, a path or this box's settings stay local); run from a project's own directory. Anything else may depend on dev02 (gs-server-deploy's
 # data, the dev01 tunnels, a --godot binary that only exists here) or write results back into
 # the project (--import, --script tools, exports), so it stays in the local queue. On success
 # the command under the wrappers is in UW_REST, its limit in UW_LIMIT and its kind in UW_KIND.
@@ -873,8 +873,8 @@ suite_boxes() {
 	elif realtime_job; then echo "${GPU_REALTIME_BOXES:-staging02}"; else echo "${GPU_SUITE_BOXES:-ph staging02 staging}"; fi
 }
 
-# The sibling repositories a project reads by a path outside itself (res://../dot-server-deploy/...,
-# $ROOT/../dot-ci): its addons/ links resolve inside the copy (--copy-links), but a path that
+# The sibling repositories a project reads by a path outside itself (res://../gs-server-deploy/...,
+# $ROOT/../gs-ci): its addons/ links resolve inside the copy (--copy-links), but a path that
 # climbs out of the project needs the sibling next to it. Found by grepping the project's own
 # sources for ../<existing sibling>, plus names in <project>/.gpu-siblings and $GPU_SIBLINGS.
 # Only git repositories count (godot/tools and inspirations/ are not). Prints one name per line.
@@ -914,7 +914,7 @@ linked_siblings() {
 	# be expanded by --copy-links either: it is excluded from the copy and relinked to the staged sibling.
 	# Prints the link's path relative to the project and its target as the link reads from its own directory.
 	# Only a link to the WHOLE repo: a link to a folder inside one (maps/imported_dm -> ../../fc-dm-maps/maps,
-	# addons/dot_x -> ../../dot-x/addons/dot_x) keeps being copied with --copy-links, because the staged sibling
+	# addons/gs_x -> ../../gs-x/addons/gs_x) keeps being copied with --copy-links, because the staged sibling
 	# carries only git ls-files -co and that folder's content may be git-ignored (fc-dm-maps' maps/*, fetched
 	# from content.lock): relinked, the box saw an empty maps/ and crackhouse/dm-morpheus "not found" (2026-11-10).
 	while IFS= read -r l; do
@@ -943,9 +943,9 @@ stage_sibling() {
 	else
 		( cd "$src" && find . -type f -not -path './.godot/*' -not -path './.git/*' -printf '%P\0' ) >"$list"
 	fi
-	# A game sibling's addons/ are git-excluded links into the dot-* repos (game-fatal-contact/addons/dot_core ->
-	# ../../dot-core/...): git ls-files omits them, and a tool that runs the game from the staged copy (dsd's
-	# pack_requires derives requires.json with addons/dot_core/tools/dot_requires.gd) found no addon there.
+	# A game sibling's addons/ are git-excluded links into the gs-* repos (game-fatal-contact/addons/gs_core ->
+	# ../../gs-core/...): git ls-files omits them, and a tool that runs the game from the staged copy (dsd's
+	# pack_requires derives requires.json with addons/gs_core/tools/gs_requires.gd) found no addon there.
 	# find -L lists what the links point at, rsync --copy-links ships it (hard-linked per version, so one copy per box).
 	if [[ -f $src/project.godot && -d $src/addons && -n $(find "$src/addons" -maxdepth 1 -type l -print -quit 2>/dev/null) ]]; then
 		( cd "$src" && find -L addons -type f -not -path '*/.git/*' -print0 ) >>"$list"
@@ -1756,7 +1756,7 @@ publish_extra_siblings() {
 
 # publish_host_addons_resolves DIR: 0 when publish_pack.sh --host-addons gives the same answer in the box's copy.
 # The copy resolves addons/ links (--copy-links), and publish_pack.sh also matches an addon by the repo its link
-# points into (zee-dot-weapons ships addons/zee_weapons); that match is lost in the copy. 1 when a link's repo
+# points into (zee-gs-weapons ships addons/zee_weapons); that match is lost in the copy. 1 when a link's repo
 # name differs from its folder name (normalised to underscores), so the publish has to stay local.
 publish_host_addons_resolves() {
 	local l n repo
@@ -1771,9 +1771,9 @@ publish_host_addons_resolves() {
 
 # gpu.sh publish [--local-ok] [env K=V...] tools/publish*.sh [args]   (run from a project directory)
 # Runs a pack publish on a staging box (default staging02, GPU_PUBLISH_BOX) because dev02 is short of
-# memory. The project, the dot-cloud checkout and every ../sibling the command names are copied to the
+# memory. The project, the gs-cloud checkout and every ../sibling the command names are copied to the
 # box with addon links resolved (the publisher excludes only what publish.sh says, same as here); the
-# token is the box's own ~/.config/dot/creator-token-<dev|prod>, chosen from the site and never sent,
+# token is the box's own ~/.config/gs/creator-token-<dev|prod>, chosen from the site and never sent,
 # printed or put in argv. Afterwards content.lock.json, the --lock file and --out dir come back, and the
 # exit code is the publish's. With --route (heavy's hook) a box that is down is exit 75 = run it here.
 publish_cmd() {
@@ -1791,7 +1791,7 @@ publish_cmd() {
 		[[ ${kv%%=*} =~ (TOKEN|KEY|SECRET|PASS|CRED) && ${kv%%=*} != GS_CLI_TOKEN_FILE ]] && $fail "a secret in the command's environment stays local"
 		envs+=("$kv")
 	done
-	[[ -z ${GS_CLI_TOKEN:-${DOT_CLI_TOKEN:-}} ]] || $fail "GS_CLI_TOKEN is set; it would have to travel, so it stays local"
+	[[ -z ${GS_CLI_TOKEN:-} ]] || $fail "GS_CLI_TOKEN is set; it would have to travel, so it stays local"
 	local ha
 	for ha in "${cmd[@]:1}"; do
 		[[ $ha == --host-addons || $ha == --host-addons=* ]] || continue
@@ -1803,9 +1803,9 @@ publish_cmd() {
 	local rroot="$REMOTE_HOME/$REMOTE_ROOT" rhome=$REMOTE_HOME
 
 	# Arguments: local paths under the tree or $HOME become the box's; --lock, --out and --site are noted.
-	local args=() lockfiles=("$PWD/content.lock.json") outs=() site=${GS_SITE:-${DOT_SITE:-}} has_token=0 a prev= v
+	local args=() lockfiles=("$PWD/content.lock.json") outs=() site=${GS_SITE:-} has_token=0 a prev= v
 	for kv in "${envs[@]}"; do [[ $kv == GS_SITE=* ]] && site=${kv#GS_SITE=}; [[ $kv == GS_CLI_TOKEN_FILE=* ]] && has_token=1; done
-	[[ -z ${GS_CLI_TOKEN_FILE:-${DOT_CLI_TOKEN_FILE:-}} ]] || has_token=1
+	[[ -z ${GS_CLI_TOKEN_FILE:-} ]] || has_token=1
 	for a in "${cmd[@]:1}"; do
 		case $prev in
 			--site) site=$a ;;
@@ -1820,16 +1820,16 @@ publish_cmd() {
 	done
 	if [[ $has_token == 0 ]]; then
 		case $site in
-			*moddingcommunity.com*) envs+=("GS_CLI_TOKEN_FILE=$rhome/.config/dot/creator-token-prod") ;;
-			*tmcdev.net*|*dev.dotgames.org*) envs+=("GS_CLI_TOKEN_FILE=$rhome/.config/dot/creator-token-dev") ;;
+			*moddingcommunity.com*) envs+=("GS_CLI_TOKEN_FILE=$rhome/.config/gs/creator-token-prod") ;;
+			*tmcdev.net*|*dev.dotgames.org*) envs+=("GS_CLI_TOKEN_FILE=$rhome/.config/gs/creator-token-dev") ;;
 		esac
 	fi
 	local tok
 	for kv in "${envs[@]}"; do [[ $kv == GS_CLI_TOKEN_FILE=* ]] && { tok=${kv#*=}; "${SSHQ[@]}" "[ -s $(printf '%q' "$tok") ]" || $fail "no token file $tok on $BOX_DESC"; }; done
 
-	# Projects to copy: this one, dot-cloud, and every $ROOT/<name> or ../<name> the arguments name
+	# Projects to copy: this one, gs-cloud, and every $ROOT/<name> or ../<name> the arguments name
 	# (not the ../ references in scripts: some siblings are GBs; list those in .gpu-siblings). Links are resolved in the copy.
-	local want=("$project" dot-cloud) n
+	local want=("$project" gs-cloud) n
 	for a in "${cmd[@]:1}"; do
 		[[ $a == "$ROOT"/* ]] && { n=${a#"$ROOT"/}; want+=("${n%%/*}"); }
 		[[ $a == ../* ]] && { n=${a#../}; want+=("${n%%/*}"); }
@@ -1853,7 +1853,7 @@ publish_cmd() {
 	for v in "${outs[@]}"; do "${SSHQ[@]}" "mkdir -p $(printf '%q' "$v")"; done
 
 	local rcmd limit=${UW_LIMIT:-3600}
-	rcmd="cd $(printf '%q' "$rroot/$project") && export GODOT=\${GODOT:-$rhome/gpu/bin/godot} && { timeout 600 \"\$GODOT\" --headless --path $(printf '%q' "$rroot/dot-cloud") --import >/dev/null 2>&1 || true; } && exec nice -n 5 timeout -k 30 $limit env ${envs[@]+$(printf '%q ' "${envs[@]}")}$(printf '%q ' "${cmd[0]}" "${args[@]}")"
+	rcmd="cd $(printf '%q' "$rroot/$project") && export GODOT=\${GODOT:-$rhome/gpu/bin/godot} && { timeout 600 \"\$GODOT\" --headless --path $(printf '%q' "$rroot/gs-cloud") --import >/dev/null 2>&1 || true; } && exec nice -n 5 timeout -k 30 $limit env ${envs[@]+$(printf '%q ' "${envs[@]}")}$(printf '%q ' "${cmd[0]}" "${args[@]}")"
 	local rc=0
 	"${SSH[@]}" "flock -o -s ~/gpu/.lock bash -lc $(printf '%q' "$rcmd")" || rc=$?
 
@@ -1877,7 +1877,7 @@ publish_cmd() {
 # The box's user is gamedev and cannot write /home/christian, so every staged directory is
 # mirrored under $PY_ROOT at its own absolute path, the command runs from the mirror of $PWD
 # with HOME pointed at the mirror of ~ (so ~/mapsrc resolves), and an argument naming a
-# path under ~ is rewritten. Scratch scripts that hard-code /home/christian/godot/dot-map/
+# path under ~ is rewritten. Scratch scripts that hard-code /home/christian/godot/gs-map/
 # tools/bsp still import it: the mirror of that directory is staged always and put on
 # PYTHONPATH. Dependencies (numpy, matplotlib, pillow) live in a venv on the box, made on
 # first use. Results come back by rsync without --delete, over the same directories.
@@ -1913,7 +1913,7 @@ py_cmd() {
 	top=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 	[[ ${#stage[@]} -gt 0 ]] || stage=("$top")
 	[[ ${#pull[@]} -gt 0 ]] || pull=("$top")
-	stage+=("$ROOT/dot-map-convert")
+	stage+=("$ROOT/gs-map-convert")
 	# --mirror (2026-11-11): a scratch script that hard-codes absolute paths (/tmp/x/regen.sh reading /home/gamedev/wt/y). Every
 	# directory it names (mirror_units) is staged under $PY_ROOT, the script runs from a rewritten copy whose paths point at the
 	# mirror, and the directories come back with --update. A unit over GPU_MIRROR_MAX_MB (default 2048) makes the whole job run
@@ -1988,7 +1988,7 @@ py_cmd() {
 		args+=("$a")
 	done
 	local cmd
-	cmd="mkdir -p $(printf '%q' "$PY_ROOT$PWD") && cd $(printf '%q' "$PY_ROOT$PWD") && HOME=$(printf '%q' "$PY_ROOT$HOME") PYTHONPATH=$(printf '%q' "$PY_ROOT$ROOT/dot-map-convert")\${PYTHONPATH:+:\$PYTHONPATH} MPLBACKEND=Agg flock -o -s ~/gpu/.lock timeout ${GPU_TIMEOUT:-3600} $(printf '%q ' "${args[@]}")"
+	cmd="mkdir -p $(printf '%q' "$PY_ROOT$PWD") && cd $(printf '%q' "$PY_ROOT$PWD") && HOME=$(printf '%q' "$PY_ROOT$HOME") PYTHONPATH=$(printf '%q' "$PY_ROOT$ROOT/gs-map-convert")\${PYTHONPATH:+:\$PYTHONPATH} MPLBACKEND=Agg flock -o -s ~/gpu/.lock timeout ${GPU_TIMEOUT:-3600} $(printf '%q ' "${args[@]}")"
 	local rc=0
 	"${SSH[@]}" "bash -lc $(printf '%q' "$cmd")" || rc=$?
 	for d in "${pull[@]}"; do

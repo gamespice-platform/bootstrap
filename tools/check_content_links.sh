@@ -58,7 +58,7 @@ printf '%-22s %-40s %-8s %-8s %s\n' game "content repos" ".sh" ".ps1" status
 linked_repos=""
 for g in $games; do
     gi="$(sibdir "$g")/.gitignore"
-    if [ ! -f "$gi" ]; then bad "$g: no checkout beside dot-bootstrap, cannot audit"; continue; fi
+    if [ ! -f "$gi" ]; then bad "$g: no checkout beside gs-bootstrap, cannot audit"; continue; fi
     repos=""; shline=ok; psline=ok; st=ok
     while read -r line; do
         spec="$(awk '{print $3}' <<< "$line")"; repo="$(canon "${spec%%/*}")"; dir="${spec#*/}"
@@ -96,18 +96,18 @@ for g in $games; do
 done
 
 # Every maps repository and weapon/monster pack must be linked by some game.
-for r in $(grep -v '^[[:space:]]*#' "$tsv" | cut -f1 | grep -E -- '-maps$|^zz-|^z[a-z]+-dot-weapons$'); do
+for r in $(grep -v '^[[:space:]]*#' "$tsv" | cut -f1 | grep -E -- '-maps$|^zz-|^z[a-z]+-gs-weapons$'); do
     case " $linked_repos " in *" $r "*) ;; *)
         # zee/zed weapons are addons (/addons/zee_weapons): linked when any plan names them.
-        grep -q "addon ${r/-dot-/_}$" <<< "$default_plan" || bad "$r is never linked by any game's .gitignore" ;;
+        grep -q "addon ${r/-gs-/_}$" <<< "$default_plan" || bad "$r is never linked by any game's .gitignore" ;;
     esac
 done
 
 # --- selectors ---
 out="$(plan)"
 [ "$(grep -c '^clone ' <<< "$out")" -eq "$(grep -v '^[[:space:]]*#' "$tsv" | grep -c .)" ] || bad "default plan does not clone every project in projects.tsv"
-out="$(plan game-arena)"   # an old name selects the renamed game
-grep -qx 'clone game-fatal-contact' <<< "$out" && grep -qx 'clone fc-surf-dm-maps' <<< "$out" && grep -qx 'clone dot-core' <<< "$out" \
+out="$(plan game-fatal-contact)"   # an old name selects the renamed game
+grep -qx 'clone game-fatal-contact' <<< "$out" && grep -qx 'clone fc-surf-dm-maps' <<< "$out" && grep -qx 'clone gs-core' <<< "$out" \
     && ! grep -qx 'clone mg-wipeout' <<< "$out" || bad "one game: want game-fatal-contact, its maps and addons, no other game"
 out="$(plan fc --games wipeout)"
 grep -qx 'clone mg-wipeout-maps' <<< "$out" && grep -qx 'clone fc-surf-dm-maps' <<< "$out" || bad "short names / --games selection"
@@ -118,16 +118,16 @@ out="$(plan --zees-games-min)"
 for g in $games; do grep -qx "clone $g" <<< "$out" || bad "--zees-games-min lacks $g"; done
 grep -E '^clone (.*-maps|zz-.*)$|^link .* content |^link .* addon zz_' <<< "$out" | grep -q . && bad "--zees-games-min cloned or linked content"
 grep -qE '^clone zz-' <<< "$out" && bad "--zees-games-min cloned a zz pack"
-grep -qx 'clone dot-core' <<< "$out" || bad "--zees-games-min lacks the addons"
+grep -qx 'clone gs-core' <<< "$out" || bad "--zees-games-min lacks the addons"
 out="$(plan --min)"
 grep -E '^clone (.*-maps|zz-.*)$|^link .* content |^link .* addon zz_' <<< "$out" | grep -q . && bad "--min --plan links or clones content for some game"
 out="$(plan mg-wipeout --min)"
 grep -qx 'clone mg-wipeout-maps' <<< "$out" && bad "--min cloned maps"
-out="$(plan --addons dot-core,weapon)"
-grep -qx 'clone dot-weapon' <<< "$out" && grep -qx 'clone dot-core' <<< "$out" && ! grep -q '^clone game-' <<< "$out" || bad "--addons selection"
+out="$(plan --addons gs-core,weapon)"
+grep -qx 'clone gs-weapon' <<< "$out" && grep -qx 'clone gs-core' <<< "$out" && ! grep -q '^clone game-' <<< "$out" || bad "--addons selection"
 out="$("$here/bootstrap.sh" --plan no-such-game 2>&1)"; rc=$?
 [ "$rc" = 2 ] && grep -q "no project or group called 'no-such-game'" <<< "$out" || bad "unknown name: want exit 2 and a clear error, got $rc: $out"
-"$here/bootstrap.sh" --plan --games dot-core >/dev/null 2>&1; [ $? = 2 ] || bad "--games dot-core (an addon) should be refused"
+"$here/bootstrap.sh" --plan --games gs-core >/dev/null 2>&1; [ $? = 2 ] || bad "--games gs-core (an addon) should be refused"
 
 # --- the 'ci' form really links under both scripts' rules ---
 mkdir -p "$tmp/mg-wipeout/addons" "$tmp/mg-wipeout-maps/courses"

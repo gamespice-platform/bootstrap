@@ -11,9 +11,9 @@ set -u
 H="$(cd "$(dirname "$0")/.." && pwd)"
 T0="$(mktemp -d)"; trap 'rm -rf "$T0"' EXIT
 pass=0; fail=0
-# The sync installs the Valve-origin hook, which needs the dot-cloud guard (set GS_CLOUD; default: sibling checkout).
-GS_CLOUD="${GS_CLOUD:-${DOT_CLOUD:-$H/../dot-cloud}}"
-[ -f "$GS_CLOUD/tools/check_valve_files.py" ] || { echo "FAIL: no dot-cloud guard at $GS_CLOUD (set GS_CLOUD)" >&2; exit 2; }
+# The sync installs the Valve-origin hook, which needs the gs-cloud guard (set GS_CLOUD; default: sibling checkout).
+GS_CLOUD="${GS_CLOUD:-$H/../gs-cloud}"
+[ -f "$GS_CLOUD/tools/check_valve_files.py" ] || { echo "FAIL: no gs-cloud guard at $GS_CLOUD (set GS_CLOUD)" >&2; exit 2; }
 check() { if eval "$2"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: [$impl] $1"; fi; }
 g() { git -C "$1" -c user.name=t -c user.email=t@t "${@:2}"; }
 

@@ -7,7 +7,7 @@
 # Exit 0 in sync, 1 drift (diff shown), 2 reference unreadable. To fix drift: copy the public nightly copy over tools/heavy.
 here=$(cd "$(dirname "$0")" && pwd)
 mine=${HEAVY_COPY:-$here/heavy}
-norm() { grep -vE '^[[:space:]]*#' "$1" | sed -E 's#[[:space:]]+"\$HOME/godot/dot-bootstrap/tools/realtime_suites.conf"##; s/[[:space:]]+$//'; }
+norm() { grep -vE '^[[:space:]]*#' "$1" | sed -E 's#[[:space:]]+"\$HOME/godot/gs-bootstrap/tools/realtime_suites.conf"##; s/[[:space:]]+$//'; }
 [ $# -gt 0 ] || set -- "${HEAVY_REFERENCE:-/usr/local/bin/heavy}"
 rc=0; tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
 for ref in "$@"; do

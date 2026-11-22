@@ -9,7 +9,7 @@
 #   tools/gen_readme.sh --check          exit 1 if README.md is out of date with profiles.json (CI)
 #
 # Pack files: tools/readme.cfg (studio settings, poses), tools/readme_adapter.gd (ids, models, poses, profile rows),
-# docs/readme/readme.yml (roles, blurbs, headings), tools/readme_shot.sh (calls ../dot-bootstrap/tools/readme/shot.sh).
+# docs/readme/readme.yml (roles, blurbs, headings), tools/readme_shot.sh (calls ../gs-bootstrap/tools/readme/shot.sh).
 # Each PNG becomes docs/img/<name>.webp (1280 px) and, for the hero, docs/img/<id>_thumb.webp (320 px). Images live
 # under docs/img/ (with a .gdignore) so they never ship in the pack. Look at every image before committing.
 set -euo pipefail

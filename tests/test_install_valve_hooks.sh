@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Tests tools/install-valve-hooks.sh against the real GameSpice Cloud guard.
-#   GUARD_SRC=/path/to/dot-cloud/tools/check_valve_files.py tests/test_install_valve_hooks.sh
-# Defaults to the sibling dot-cloud checkout. Fails loudly when the guard cannot be found.
+#   GUARD_SRC=/path/to/gs-cloud/tools/check_valve_files.py tests/test_install_valve_hooks.sh
+# Defaults to the sibling gs-cloud checkout. Fails loudly when the guard cannot be found.
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 installer="$here/../tools/install-valve-hooks.sh"
-guard_src="${GUARD_SRC:-$here/../../dot-cloud/tools/check_valve_files.py}"
+guard_src="${GUARD_SRC:-$here/../../gs-cloud/tools/check_valve_files.py}"
 [ -f "$guard_src" ] || { echo "FAIL: no guard at $guard_src (set GUARD_SRC)" >&2; exit 2; }
 guard_src="$(cd "$(dirname "$guard_src")" && pwd)/$(basename "$guard_src")"
 
@@ -14,21 +14,21 @@ pass() { echo "ok   $1"; passes=$((passes + 1)); }
 fail() { echo "FAIL $1"; fails=$((fails + 1)); }
 
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
-P="$T/projects"; mkdir -p "$P/dot-cloud/tools" "$P/repo-a" "$P/repo-b" "$P/not-a-repo"
-ln -s "$guard_src" "$P/dot-cloud/tools/check_valve_files.py"
-for r in dot-cloud repo-a repo-b; do git -C "$P/$r" init -q; done
+P="$T/projects"; mkdir -p "$P/gs-cloud/tools" "$P/repo-a" "$P/repo-b" "$P/not-a-repo"
+ln -s "$guard_src" "$P/gs-cloud/tools/check_valve_files.py"
+for r in gs-cloud repo-a repo-b; do git -C "$P/$r" init -q; done
 
 # 1. Install reports every repository and writes the hook.
 out="$(bash "$installer" "$P" 2>&1)"; rc=$?
 [ $rc -eq 0 ] && pass "install exits 0" || fail "install exit $rc: $out"
 echo "$out" | grep -q "3 of 3 repositories" && pass "summary counts three repositories" || fail "summary: $out"
 hook="$P/repo-a/.git/hooks/pre-commit"
-[ -x "$hook" ] && grep -qF "$P/dot-cloud/tools/check_valve_files.py" "$hook" && pass "hook is executable and names the guard" || fail "hook missing or wrong"
+[ -x "$hook" ] && grep -qF "$P/gs-cloud/tools/check_valve_files.py" "$hook" && pass "hook is executable and names the guard" || fail "hook missing or wrong"
 [ -e "$P/not-a-repo/.git" ] && fail "touched a non-repository" || pass "non-repository directory left alone"
 
 # 2. Idempotent: a second run adds no second line.
 bash "$installer" "$P" >/dev/null 2>&1
-n="$(grep -cF "$P/dot-cloud/tools/check_valve_files.py" "$hook")"
+n="$(grep -cF "$P/gs-cloud/tools/check_valve_files.py" "$hook")"
 [ "$n" -eq 1 ] && pass "second install does not duplicate the hook line" || fail "guard line count $n after two installs"
 
 # 3. --check passes when all have it, fails when one does not.
@@ -50,7 +50,7 @@ git -C "$P/repo-a" -c user.name=t -c user.email=t@example.invalid commit -q -m o
 
 # 5. A missing projects directory or guard is a setup error (exit 2), never a silent pass.
 bash "$installer" "$T/nowhere" >/dev/null 2>&1; [ $? -eq 2 ] && pass "missing projects directory exits 2" || fail "missing directory did not exit 2"
-rm "$P/dot-cloud/tools/check_valve_files.py"
+rm "$P/gs-cloud/tools/check_valve_files.py"
 bash "$installer" "$P" >/dev/null 2>&1; [ $? -eq 2 ] && pass "missing guard exits 2" || fail "missing guard did not exit 2"
 
 # 6. GS_CLOUD points at a guard outside the projects directory; a bad one is exit 2.

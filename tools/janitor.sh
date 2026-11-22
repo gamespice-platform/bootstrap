@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # box-janitor.sh: keeps a build/test box (ph-tmc-dev, 320 GB disk) under budget. Runs from cron every 10 min as gamedev.
-# Source of truth is dot-bootstrap/tools/janitor.sh; the box copy is ~/gpu/janitor.sh (install: cp it there, chmod +x).
+# Source of truth is gs-bootstrap/tools/janitor.sh; the box copy is ~/gpu/janitor.sh (install: cp it there, chmod +x).
 # Every file under ~/gpu is a copy staged by gpu.sh or a cache, so deleting is recoverable, but a job that loses its workspace
 # mid-run fails, so a workspace or sibling version is NEVER removed while it is live. Live means any of:
 #   - a job holds its lock (suite/<wsid>.lock, checked with flock -n),

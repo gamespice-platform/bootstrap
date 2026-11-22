@@ -1,6 +1,6 @@
 extends Node3D
 
-## The README studio, shared by every content pack (dot-bootstrap tools/readme/). A pack's tools/readme_shot.sh copies
+## The README studio, shared by every content pack (gs-bootstrap tools/readme/). A pack's tools/readme_shot.sh copies
 ## this file and readme_studio.tscn into <pack>/tools/readme_studio/ (git-ignored) and runs it on a GPU box.
 ##
 ## What it draws comes from the pack: tools/readme.cfg names an adapter script ([shot] adapter, default

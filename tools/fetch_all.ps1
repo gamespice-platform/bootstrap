@@ -11,7 +11,7 @@ foreach ($lock in Get-ChildItem -Path $Projects -Directory | ForEach-Object { Jo
     if ($Except.Count) { $a.Except = $Except }
     if ($Cdn) { $a.Cdn = $Cdn }
     if ($List) { $a.List = $true }
-    $deploy = Join-Path $Projects 'dot-server-deploy'
+    $deploy = Join-Path $Projects 'gs-server-deploy'
     if (Test-Path $deploy) { $a.Packs = Join-Path $deploy 'content\packs' }
     if ((Test-Path (Join-Path $deploy 'cfg')) -and -not (Test-Path (Join-Path $dir 'cfg'))) { $a.Cfg = Join-Path $deploy 'cfg' }
     Write-Host "== $(Split-Path -Leaf $dir)"; $n++

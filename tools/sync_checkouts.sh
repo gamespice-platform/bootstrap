@@ -5,7 +5,7 @@
 #
 # Why: every game's addons/ links point at the sibling checkouts here, and gpu.sh/hv stage those same
 # working trees to PH and the staging boxes (no box keeps its own clone). Agents push from worktrees
-# (`git push origin branch:main`), which never moves this checkout, so it fell behind (dot-player-char
+# (`git push origin branch:main`), which never moves this checkout, so it fell behind (gs-player-char
 # ran one commit old and a figure suite failed against stale code). Nothing updated them before this.
 #
 # Stale state is saved, never destroyed: a local tag whose commit differs from origin's (a tag moved after it was

@@ -2,11 +2,11 @@
 # THE one fetcher: fetch exactly what a repo's content.lock.json names, hash-checked, once (resumable, present files skipped).
 #   tools/fetch_lock.sh <content.lock.json> [--root DIR] [--from BASE|--cdn URL] [--cfg DIR] [--skip|--except ITEM[,ITEM]]
 #                       [--only ITEM[,ITEM]] [--packs DIR] [--list]
-# Lock (written by dot-cloud's `publish --upload --lock`, format in dot-cloud docs/cdn-publish.md): {format, origin, mirrors[],
+# Lock (written by gs-cloud's `publish --upload --lock`, format in gs-cloud docs/cdn-publish.md): {format, origin, mirrors[],
 # packs[{id, version, manifest_sha256, into, kind, optional}]}. kind "store" files are written to <root>/<into>; a kind "pack" is
 # mirrored to --packs DIR/<id>/<version>/ (manifest.json + objects/) when given, else left for GSCloudClient to mount.
 # WHERE FROM, first set wins: --from BASE (a folder or a full origin URL), GS_PACKS_FROM (`none` fetches nothing),
-#   --cdn URL / GS_CDN_URL, GS_CDN_URL in dot-bootstrap/.env (beside this tools/ folder; one edit for every repo), the lock's
+#   --cdn URL / GS_CDN_URL, GS_CDN_URL in gs-bootstrap/.env (beside this tools/ folder; one edit for every repo), the lock's
 #   own `origin` then its `mirrors`, https://content.gamespice.net. A CDN URL is the site root: "/content" is added unless it ends in it.
 # WHAT: ITEM is a pack id, its name half, its `into` folder, its kind or the repo (the lock's folder name); globs allowed
 #   (`gamemann/zz-*`). --only keeps matches, --skip/--except drops them. With --cfg DIR (default <lock folder>/cfg) the
@@ -20,10 +20,10 @@
 # A token file path in GS_PACKS_TOKEN_FILE (never the token itself) is sent as a bearer.
 set -euo pipefail
 LOCK="${1:?usage: fetch_lock.sh <content.lock.json> [--root DIR] [--from BASE|--cdn URL] [--cfg DIR] [--skip IDs] [--only IDs] [--packs DIR] [--list]}"; shift
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; CFG=""; CDN="${GS_CDN_URL:-${DOT_CDN_URL:-}}"; LIST=0
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; CFG=""; CDN="${GS_CDN_URL:-}"; LIST=0
 [ -f "$LOCK" ] || { echo "fetch_lock: no $LOCK, nothing pinned"; exit 0; }
 ROOT="$(cd "$(dirname "$LOCK")" && pwd)"
-FROM="${GS_PACKS_FROM:-${DOT_PACKS_FROM:-}}"; SKIP=""; ONLY=""; PACKS=""
+FROM="${GS_PACKS_FROM:-}"; SKIP=""; ONLY=""; PACKS=""
 while [ $# -gt 0 ]; do
     case $1 in
         --root) ROOT="$(cd "${2:?}" && pwd)"; shift 2 ;;
@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
         *) echo "fetch_lock: unknown argument $1" >&2; exit 2 ;;
     esac
 done
-[ "${GS_PACKS_FROM:-${DOT_PACKS_FROM:-}}" = none ] || [ "$FROM" = none ] && { echo "fetch_lock: GS_PACKS_FROM=none, nothing fetched"; exit 0; }
+[ "${GS_PACKS_FROM:-}" = none ] || [ "$FROM" = none ] && { echo "fetch_lock: GS_PACKS_FROM=none, nothing fetched"; exit 0; }
 command -v python3 >/dev/null || { echo "fetch_lock: python3 is needed" >&2; exit 2; }
 exec python3 -I - "$LOCK" "$ROOT" "$FROM" "$SKIP" "$ONLY" "$PACKS" "$HERE" "$CFG" "$CDN" "$LIST" <<'PY'
 import base64, fnmatch, hashlib, json, math, os, sys, time, urllib.request, urllib.error, zlib
@@ -56,8 +56,8 @@ def dotenv(path):
     return out
 
 env = dotenv(os.path.join(here, ".env"))
-if not base and not cdn: cdn = env.get("GS_CDN_URL", env.get("DOT_CDN_URL", ""))
-if not base and not cdn: base = env.get("GS_PACKS_FROM", env.get("DOT_PACKS_FROM", ""))
+if not base and not cdn: cdn = env.get("GS_CDN_URL", "")
+if not base and not cdn: base = env.get("GS_PACKS_FROM", "")
 if cdn and not base:
     base = cdn.rstrip("/")
     if "://" in base and not base.endswith("/content"): base += "/content"
@@ -125,19 +125,19 @@ if listing == "1":
         w = wanted(p); print("%s %s %s %s" % ("skip " if w else "fetch", p["id"], p["version"], w))
     sys.exit(0)
 tok = ""
-tf = os.environ.get("GS_PACKS_TOKEN_FILE", os.environ.get("DOT_PACKS_TOKEN_FILE", ""))
+tf = os.environ.get("GS_PACKS_TOKEN_FILE", "")
 if tf: tok = open(tf).read().strip()
 
 def get(url, start=0):
     # Cloudflare refuses the default Python-urllib agent (error 1010) on dev.dotgames.org.
-    h = {"User-Agent": "dot-bootstrap-fetch-lock/1"}
+    h = {"User-Agent": "gs-bootstrap-fetch-lock/1"}
     if tok: h["Authorization"] = "Bearer " + tok
     if start: h["Range"] = "bytes=%d-" % start
     return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60)
 
-# The pack's progress line, as tools/dot_download.ps1 prints it: name, file i/n, MB done / total, MB/s, ETA, at most
+# The pack's progress line, as tools/gs_download.ps1 prints it: name, file i/n, MB done / total, MB/s, ETA, at most
 # every GS_PROGRESS_SECONDS (2) s, and a done line if any was shown.
-try: EVERY = max(0.0, float(os.environ.get("GS_PROGRESS_SECONDS", os.environ.get("DOT_PROGRESS_SECONDS", "2"))))
+try: EVERY = max(0.0, float(os.environ.get("GS_PROGRESS_SECONDS", "2")))
 except ValueError: EVERY = 2.0
 def eta(s):
     s = int(math.ceil(s))
@@ -202,7 +202,7 @@ def pinned(p):
 
 # Renamed CDN hosts, old=new (the game CDN dotgames.org became content.gamespice.net and stays served under both).
 # GS_ORIGIN_ALIASES replaces the list (space separated old=new); empty turns it off.
-ALIASES = [a.split("=", 1) for a in os.environ.get("GS_ORIGIN_ALIASES", os.environ.get("DOT_ORIGIN_ALIASES", "https://dotgames.org=https://content.gamespice.net")).split() if "=" in a]
+ALIASES = [a.split("=", 1) for a in os.environ.get("GS_ORIGIN_ALIASES", "https://dotgames.org=https://content.gamespice.net").split() if "=" in a]
 
 def canon(u):
     u = u.rstrip("/")
@@ -220,7 +220,7 @@ for p in doc["packs"]:
         # Mirror the origin's layout (manifest.json + objects/) so a server serves it as published.
         w = wanted(p)
         if w: print("skip", pid, "(%s)" % w); continue
-        out = os.path.join(packs, pid, ver); stamp = os.path.join(out, ".dot-pack"); want = "%s %s %s" % (pid, ver, stamp_sha)
+        out = os.path.join(packs, pid, ver); stamp = os.path.join(out, ".gs-pack"); want = "%s %s %s" % (pid, ver, stamp_sha)
         if os.path.exists(stamp) and open(stamp).read().strip() == want: print("have", pid, ver); continue
         try:
             fetch("%s/%s/manifest.json" % (pid, ver), os.path.join(out, "manifest.json"), mh)
@@ -235,7 +235,7 @@ for p in doc["packs"]:
     if kind != "store": continue
     w = wanted(p)
     if w: print("skip", pid, "(%s)" % w); continue
-    out = os.path.join(root, into); stamp = os.path.join(out, ".dot-pack")
+    out = os.path.join(root, into); stamp = os.path.join(out, ".gs-pack")
     want = "%s %s %s" % (pid, ver, stamp_sha)
     if os.path.exists(stamp) and open(stamp).read().strip() == want:
         print("have", pid, ver); continue

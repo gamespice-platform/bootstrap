@@ -6,7 +6,7 @@
 # leaves both alone when both names exist; and leaves a foreign checkout under the old
 # name alone while cloning the listed one. Local bare remotes only; nothing leaves $T.
 # The sync also installs the Valve-origin hook, which runs tools/install-valve-hooks.sh and
-# needs a dot-cloud guard; this test has no dot-cloud checkout, so it gets a stand-in guard
+# needs a gs-cloud guard; this test has no gs-cloud checkout, so it gets a stand-in guard
 # (it only writes the hook) and the real installer. The guard itself is tested by
 # test_install_valve_hooks.sh.
 set -u
@@ -16,10 +16,10 @@ check() { if eval "$2"; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL
 
 T="$(mktemp -d)"; trap 'kill $holder 2>/dev/null; rm -rf "$T"' EXIT
 holder=
-mkdir -p "$T/bs/tools" "$T/remote" "$T/dot-cloud/tools"
+mkdir -p "$T/bs/tools" "$T/remote" "$T/gs-cloud/tools"
 cp "$H/bootstrap.sh" "$T/bs/"
 cp "$H/tools/install-valve-hooks.sh" "$T/bs/tools/"
-cat > "$T/dot-cloud/tools/check_valve_files.py" <<'PY'
+cat > "$T/gs-cloud/tools/check_valve_files.py" <<'PY'
 # Stand-in for GameSpice Cloud's guard: --install-hook writes a pre-commit hook that names this file.
 import os, subprocess, sys
 if len(sys.argv) != 3 or sys.argv[1] != "--install-hook": sys.exit(2)
@@ -60,7 +60,7 @@ old_tree() { # <projects dir>
 }
 run() { # <projects dir> <VAR=value or ""> [bootstrap arguments]
     local p="$1" e="$2"; shift 2
-    (cd "$T" && env GS_PROJECTS="$p" GS_CLOUD="$T/dot-cloud" GS_NATIVES=none GS_STORES_FROM=none NO_COLOR=1 GS_JOBS=1 $e ./bs/bootstrap.sh "$@" 2>&1)
+    (cd "$T" && env GS_PROJECTS="$p" GS_CLOUD="$T/gs-cloud" GS_NATIVES=none GS_STORES_FROM=none NO_COLOR=1 GS_JOBS=1 $e ./bs/bootstrap.sh "$@" 2>&1)
 }
 
 # 1. The move: dirty work kept, links repointed, old names left as links, --check clean.

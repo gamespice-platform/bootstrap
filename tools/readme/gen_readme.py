@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write the generated parts of a pack's README.md (dot-bootstrap tools/readme/, run by gen_readme.sh from the pack root).
+"""Write the generated parts of a pack's README.md (gs-bootstrap tools/readme/, run by gen_readme.sh from the pack root).
 
 Numbers come only from docs/readme/profiles.json, which the studio writes from the pack's own data (the adapter's
 profile(): the effective defaults a server starts with). Words come from docs/readme/readme.yml:

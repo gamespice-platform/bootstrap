@@ -9,8 +9,8 @@ cp "$here/tools/heavy" "$tmp/ref"
 "$chk" "$tmp/ref" >/dev/null; t "identical copy" 0 $?
 sed -E 's/^( *# .*)$/\1 changed/; 1a # extra comment' "$tmp/ref" > "$tmp/ref2"
 "$chk" "$tmp/ref2" >/dev/null; t "comment-only differences" 0 $?
-sed -E 's#realtime_suites.conf"; do#realtime_suites.conf" "$HOME/godot/dot-bootstrap/tools/realtime_suites.conf"; do#' "$tmp/ref" > "$tmp/ref3"
-grep -q "godot/dot-bootstrap" "$tmp/ref3" || { echo "FAIL test setup"; fail=1; }
+sed -E 's#realtime_suites.conf"; do#realtime_suites.conf" "$HOME/godot/gs-bootstrap/tools/realtime_suites.conf"; do#' "$tmp/ref" > "$tmp/ref3"
+grep -q "godot/gs-bootstrap" "$tmp/ref3" || { echo "FAIL test setup"; fail=1; }
 "$chk" "$tmp/ref3" >/dev/null; t "private conf fallback path" 0 $?
 { cat "$tmp/ref"; echo 'echo drift'; } > "$tmp/ref4"
 "$chk" "$tmp/ref4" >/dev/null; t "code drift detected" 1 $?

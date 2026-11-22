@@ -1,5 +1,5 @@
 # Driven by test_export.sh. Loads the export functions out of bootstrap.ps1 by name (the
-# script itself cannot be dot-sourced: it runs a sync) and checks them against a fake release.
+# script itself cannot be gs-sourced: it runs a sync) and checks them against a fake release.
 $ErrorActionPreference = 'Stop'
 $pass = 0; $fail = 0
 function Check ($name, $cond) { if ($cond) { $script:pass++ } else { $script:fail++; Write-Host "FAIL: $name" } }
@@ -19,7 +19,7 @@ foreach ($w in $wanted) {
     if ($f) { Invoke-Expression $f.Extent.Text }
 }
 $script:said = @()
-. "$env:H/tools/dot_download.ps1"  # Invoke-GSDownload, as bootstrap.ps1 loads it
+. "$env:H/tools/gs_download.ps1"  # Invoke-GSDownload, as bootstrap.ps1 loads it
 function Say ($n, $m, $c) { }
 function Ok ($n, $m) { }
 function Warn ($n, $m) { $script:warned += $m }
@@ -107,31 +107,31 @@ Check 'natives: the other platform reads its own' ((@(Get-ExportNatives $ng 'lin
 
 # A library an addon loads itself from a .cfg (GameSpice Net's) is copied beside the export by hand.
 $rg = Join-Path $env:T 'rgame'
-New-Item -ItemType Directory -Force -Path (Join-Path $rg 'addons/dot_net/native/bin'), (Join-Path $rg 'addons/other/native'), (Join-Path $rg 'addons/plain/native') | Out-Null
-Set-Content -Path (Join-Path $rg 'addons/dot_net/native/dot_net_native.cfg') -Value "[configuration]`nentry_symbol = `"x_init`"`n[libraries]`nwindows.debug.x86_64 = `"bin/libn.windows.template_debug.x86_64.dll`"`nwindows.release.x86_64 = `"bin/libn.windows.template_release.x86_64.dll`""
-Set-Content -Path (Join-Path $rg 'addons/dot_net/native/bin/libn.windows.template_release.x86_64.dll') -Value 'rel'
+New-Item -ItemType Directory -Force -Path (Join-Path $rg 'addons/gs_net/native/bin'), (Join-Path $rg 'addons/other/native'), (Join-Path $rg 'addons/plain/native') | Out-Null
+Set-Content -Path (Join-Path $rg 'addons/gs_net/native/gs_net_native.cfg') -Value "[configuration]`nentry_symbol = `"x_init`"`n[libraries]`nwindows.debug.x86_64 = `"bin/libn.windows.template_debug.x86_64.dll`"`nwindows.release.x86_64 = `"bin/libn.windows.template_release.x86_64.dll`""
+Set-Content -Path (Join-Path $rg 'addons/gs_net/native/bin/libn.windows.template_release.x86_64.dll') -Value 'rel'
 Set-Content -Path (Join-Path $rg 'addons/other/native/o.cfg') -Value "[configuration]`nentry_symbol = `"o_init`"`n[libraries]`nlinux.release.x86_64 = `"bin/libo.so`""
 Set-Content -Path (Join-Path $rg 'addons/plain/native/plugin.cfg') -Value "[plugin]`nname=`"plain`""
 $rn = @(Get-RuntimeNatives $rg 'windows')
 Check 'runtime natives: only cfgs with an entry_symbol' ($rn.Count -eq 2)
-Check 'runtime natives: the release library, path kept' ($rn[0].Lib -eq 'bin/libn.windows.template_release.x86_64.dll' -and $rn[0].Cfg -like '*dot_net_native.cfg')
+Check 'runtime natives: the release library, path kept' ($rn[0].Lib -eq 'bin/libn.windows.template_release.x86_64.dll' -and $rn[0].Cfg -like '*gs_net_native.cfg')
 Check 'runtime natives: none for this platform is empty' ($rn[1].Lib -eq '')
 $bo = Join-Path $env:T 'rout'; New-Item -ItemType Directory -Force -Path (Join-Path $bo 'o') | Out-Null
 $script:warned = @(); $script:said = @()
 Check 'runtime natives: copied' (Copy-RuntimeNatives $rg 'windows' $bo)
-Check 'runtime natives: the cfg goes into <out>/<cfg name>/' (Test-Path (Join-Path $bo 'dot_net_native/dot_net_native.cfg'))
-Check 'runtime natives: the library beside it at the cfg path' ((Get-Content (Join-Path $bo 'dot_net_native/bin/libn.windows.template_release.x86_64.dll') -ErrorAction SilentlyContinue) -eq 'rel')
-Check 'runtime natives: the debug library is not copied' (-not (Test-Path (Join-Path $bo 'dot_net_native/bin/libn.windows.template_debug.x86_64.dll')))
+Check 'runtime natives: the cfg goes into <out>/<cfg name>/' (Test-Path (Join-Path $bo 'gs_net_native/gs_net_native.cfg'))
+Check 'runtime natives: the library beside it at the cfg path' ((Get-Content (Join-Path $bo 'gs_net_native/bin/libn.windows.template_release.x86_64.dll') -ErrorAction SilentlyContinue) -eq 'rel')
+Check 'runtime natives: the debug library is not copied' (-not (Test-Path (Join-Path $bo 'gs_net_native/bin/libn.windows.template_debug.x86_64.dll')))
 Check 'runtime natives: a missing one warns and leaves nothing stale' (-not (Test-Path (Join-Path $bo 'o')) -and $script:warned.Count -eq 1 -and $script:said.Count -eq 0)
 
 # Pins: the optional third field is the library directory; a Godot-named file counts as built.
 $gi = Join-Path $env:T 'pins.gitignore'
-Set-Content -Path $gi -Value "# bootstrap-natives: dot-sim v1.0.0`n# bootstrap-optional`n/addons/dot_sim`n# bootstrap-natives: dot-net v1.2.3 native/bin/`n/addons/dot_net"
+Set-Content -Path $gi -Value "# bootstrap-natives: gs-sim v1.0.0`n# bootstrap-optional`n/addons/gs_sim`n# bootstrap-natives: gs-net v1.2.3 native/bin/`n/addons/gs_net"
 function Get-GitignorePath ($p) { $gi }
 $pins = @(Get-NativesFor 'x')
 Check 'pins: both read' ($pins.Count -eq 2)
-Check 'pins: bin by default' ($pins[0].Addon -eq 'dot_sim' -and $pins[0].LibDir -eq 'bin')
-Check 'pins: the third field, trailing slash dropped' ($pins[1].Addon -eq 'dot_net' -and $pins[1].Tag -eq 'v1.2.3' -and $pins[1].LibDir -eq 'native/bin')
+Check 'pins: bin by default' ($pins[0].Addon -eq 'gs_sim' -and $pins[0].LibDir -eq 'bin')
+Check 'pins: the third field, trailing slash dropped' ($pins[1].Addon -eq 'gs_net' -and $pins[1].Tag -eq 'v1.2.3' -and $pins[1].LibDir -eq 'native/bin')
 $lb = Join-Path $env:T 'libdir'; New-Item -ItemType Directory -Force -Path $lb | Out-Null
 Check 'built here: an empty folder is not' (-not (Test-NativeBuiltHere $lb 'windows-x86_64'))
 Set-Content -Path (Join-Path $lb 'libn.linux.template_release.x86_64.so') -Value 'x'
@@ -141,7 +141,7 @@ Check 'built here: a Godot-named library for the platform' (Test-NativeBuiltHere
 Set-Content -Path (Join-Path $lb 'libn.macos.template_release.universal.dylib') -Value 'x'
 Check 'built here: universal serves every arch' (Test-NativeBuiltHere $lb 'macos-arm64')
 New-Item -ItemType Directory -Force -Path (Join-Path $lb 'linux-arm64') | Out-Null; Set-Content -Path (Join-Path $lb 'linux-arm64/l.so') -Value 'x'
-Check 'built here: a platform folder (dot-sim)' (Test-NativeBuiltHere $lb 'linux-arm64')
+Check 'built here: a platform folder (gs-sim)' (Test-NativeBuiltHere $lb 'linux-arm64')
 
 # What the exported game is started with.
 $d = @(Get-ExportPlayArgs '')

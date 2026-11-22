@@ -7,10 +7,10 @@
 # The guard is GameSpice Cloud's tools/check_valve_files.py. Its --install-hook writes the hook, which
 # runs `--git --staged` on every commit and refuses a staged .vpk, .vtf, .vmt, .mdl, .vvd, .vtx,
 # .phy, .ani or textures/orig file. Nothing is copied here: the hook names the guard in the
-# dot-cloud checkout beside the repositories, so updating dot-cloud updates the guard everywhere.
+# gs-cloud checkout beside the repositories, so updating gs-cloud updates the guard everywhere.
 # That path is absolute, so run this again after moving the projects directory.
 #
-# GS_CLOUD names the dot-cloud checkout holding the guard (default: dot-cloud inside PROJECTS_DIR).
+# GS_CLOUD names the gs-cloud checkout holding the guard (default: gs-cloud inside PROJECTS_DIR).
 #
 # PROJECTS_DIR defaults to GS_PROJECTS, else ./projects beside this script (bootstrap.sh's own
 # default). Every immediate subdirectory with a .git (directory or worktree file) is a repository.
@@ -19,19 +19,19 @@
 # --check changes nothing: it lists each repository whose pre-commit hook does not name the guard.
 #
 # Exit 0 when every repository has the hook, 1 when one could not be set up (or, with --check,
-# one is missing it), 2 on a setup error such as no dot-cloud checkout.
+# one is missing it), 2 on a setup error such as no gs-cloud checkout.
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 check=0
 if [ "${1:-}" = "--check" ]; then check=1; shift; fi
-projects="${1:-${GS_PROJECTS:-${DOT_PROJECTS:-$here/../projects}}}"
+projects="${1:-${GS_PROJECTS:-$here/../projects}}"
 
 [ -d "$projects" ] || { echo "install-valve-hooks: no projects directory at $projects (run bootstrap.sh first, or pass one)" >&2; exit 2; }
 projects="$(cd "$projects" && pwd)"
-cloud="${GS_CLOUD:-${DOT_CLOUD:-$projects/dot-cloud}}"
+cloud="${GS_CLOUD:-$projects/gs-cloud}"
 guard="$cloud/tools/check_valve_files.py"
-[ -f "$guard" ] || { echo "install-valve-hooks: no guard at $guard (set GS_CLOUD to a dot-cloud checkout, or clone it with: bootstrap.sh --only dot-cloud --no-deps)" >&2; exit 2; }
+[ -f "$guard" ] || { echo "install-valve-hooks: no guard at $guard (set GS_CLOUD to a gs-cloud checkout, or clone it with: bootstrap.sh --only gs-cloud --no-deps)" >&2; exit 2; }
 
 rc=0; total=0; have=0
 for d in "$projects"/*/; do

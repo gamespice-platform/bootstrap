@@ -76,24 +76,24 @@ f' 2>&1); rc=$?
 		*) [[ $rc == 75 && $out == *QUEUED* ]] && ok "offer_on check, $t tree: sent back to the queue" || bad "offer_on check, $t tree: rc=$rc out=$out" ;;
 	esac
 done
-# 4. the GameSpice SQL case: games/addons/dot_sql -> the GameSpice SQL repo's addons/dot_sql, which holds dot_sql -> itself. The loop
+# 4. the GameSpice SQL case: games/addons/gs_sql -> the GameSpice SQL repo's addons/gs_sql, which holds gs_sql -> itself. The loop
 # lives inside the other link's target, so only find -L reaches it. It is found, excluded, and rsync (--copy-links, the
 # gpu.sh options) then copies the rest and not the loop; a second tree has a loop AND a dangling link, which still queues.
-mkdir -p "$root/dot-sql/addons/dot_sql/core" "$root/game/addons" "$root/game2/addons"
-: > "$root/dot-sql/addons/dot_sql/core/a.gd"
-ln -s "$root/dot-sql/addons/dot_sql" "$root/dot-sql/addons/dot_sql/dot_sql"
-ln -s "$root/dot-sql/addons/dot_sql" "$root/game/addons/dot_sql"
-ln -s "$root/dot-sql/addons/dot_sql" "$root/game2/addons/dot_sql"; ln -s missing "$root/game2/gone"
+mkdir -p "$root/gs-sql/addons/gs_sql/core" "$root/game/addons" "$root/game2/addons"
+: > "$root/gs-sql/addons/gs_sql/core/a.gd"
+ln -s "$root/gs-sql/addons/gs_sql" "$root/gs-sql/addons/gs_sql/gs_sql"
+ln -s "$root/gs-sql/addons/gs_sql" "$root/game/addons/gs_sql"
+ln -s "$root/gs-sql/addons/gs_sql" "$root/game2/addons/gs_sql"; ln -s missing "$root/game2/gone"
 got=$(bash -c "$fn"'; '"$fn2"'; loop_links "$1"' _ "$root/game")
-[[ $got == addons/dot_sql/dot_sql ]] && ok "loop_links finds the loop inside a linked addon" || bad "loop_links: [$got]"
+[[ $got == addons/gs_sql/gs_sql ]] && ok "loop_links finds the loop inside a linked addon" || bad "loop_links: [$got]"
 [[ -z $(bash -c "$fn"'; '"$fn2"'; loop_links "$1"' _ "$root/clean") ]] && ok "loop_links on a clean tree: nothing" || bad "loop_links on a clean tree found something"
-rest=$(bash -c 'set -euo pipefail; '"$fn"'; '"$fn2"'; unresolved_except_loops "$1" addons/dot_sql/dot_sql' _ "$root/game")
+rest=$(bash -c 'set -euo pipefail; '"$fn"'; '"$fn2"'; unresolved_except_loops "$1" addons/gs_sql/gs_sql' _ "$root/game")
 [[ -z $rest ]] && ok "the loop is not reported as unresolved once excluded" || bad "still reported: $rest"
-rest2=$(bash -c 'set -euo pipefail; '"$fn"'; '"$fn2"'; unresolved_except_loops "$1" addons/dot_sql/dot_sql' _ "$root/game2")
+rest2=$(bash -c 'set -euo pipefail; '"$fn"'; '"$fn2"'; unresolved_except_loops "$1" addons/gs_sql/gs_sql' _ "$root/game2")
 [[ $rest2 == "dangling: ./gone" ]] && ok "a dangling link next to a loop is still reported" || bad "dangling not reported: [$rest2]"
 if command -v rsync >/dev/null; then
-	rsync -a --copy-links --exclude /addons/dot_sql/dot_sql "$root/game/" "$root/out/" 2>"$root/rs.err"; rc=$?
-	[[ $rc == 0 && -f $root/out/addons/dot_sql/core/a.gd && ! -e $root/out/addons/dot_sql/dot_sql ]] && ok "rsync --copy-links with the exclude copies the addon and not the loop" || bad "rsync rc=$rc: $(head -3 "$root/rs.err")"
+	rsync -a --copy-links --exclude /addons/gs_sql/gs_sql "$root/game/" "$root/out/" 2>"$root/rs.err"; rc=$?
+	[[ $rc == 0 && -f $root/out/addons/gs_sql/core/a.gd && ! -e $root/out/addons/gs_sql/gs_sql ]] && ok "rsync --copy-links with the exclude copies the addon and not the loop" || bad "rsync rc=$rc: $(head -3 "$root/rs.err")"
 fi
 # 5. a link chain that never resolves: A -> B -> A, and a ring of three. find -L calls these "Too many levels of symbolic
 # links", not a directory loop, so neither the loop list nor the report had them: rsync --copy-links stopped with rc 23.

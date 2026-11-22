@@ -6,10 +6,10 @@ no parse error, and the call then binds to the ENGINE's implementation -- so the
 present, reachable, called, and inert. It is invisible to every other detector this family
 runs: the name occurs more than once, it has callers, and the body reads correctly.
 
-    godot/dot-bootstrap/tools/shadowed_methods.py            # every project
-    godot/dot-bootstrap/tools/shadowed_methods.py --self-test # prove it fires first
+    godot/gs-bootstrap/tools/shadowed_methods.py            # every project
+    godot/gs-bootstrap/tools/shadowed_methods.py --self-test # prove it fires first
 
-Why this lives in dot-bootstrap: it is the repository that already owns the family as a
+Why this lives in gs-bootstrap: it is the repository that already owns the family as a
 whole -- `projects.tsv` is "the one list" -- and this detector has to read every project
 at once to resolve a `class_name` in one repository against an `extends` in another.
 

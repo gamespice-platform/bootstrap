@@ -9,7 +9,7 @@ T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 pass=0; fail=0
 check() { if eval "$2"; then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: $1"; fi; }
 g() { git -C "$1" -c user.name=t -c user.email=t@t "${@:2}"; }
-mkdir -p "$T/root/dot-bootstrap/tools" "$T/o" "$T/w"; cp "$H/tools/sync_checkouts.sh" "$T/root/dot-bootstrap/tools/"
+mkdir -p "$T/root/gs-bootstrap/tools" "$T/o" "$T/w"; cp "$H/tools/sync_checkouts.sh" "$T/root/gs-bootstrap/tools/"
 for n in stale newcontent moved; do
     git init -q --bare -b main "$T/o/$n.git"; git clone -q "$T/o/$n.git" "$T/w/$n" 2>/dev/null
     echo a > "$T/w/$n/f"; echo '#!/bin/sh' > "$T/w/$n/s.sh"; g "$T/w/$n" add .; g "$T/w/$n" commit -qm one; g "$T/w/$n" push -q origin HEAD:main
@@ -28,11 +28,11 @@ echo n >> "$T/w/moved/f"; g "$T/w/moved" commit -qam two; g "$T/w/moved" push -q
 old="$(git -C "$T/root/moved" rev-parse v1)"; new="$(git -C "$T/w/moved" rev-parse v1)"
 newcontent_head="$(git -C "$T/root/newcontent" rev-parse HEAD)"
 
-out="$(SYNC_ROOT="$T/root" SYNC_HELD_FILE=/dev/null bash "$T/root/dot-bootstrap/tools/sync_checkouts.sh")"
+out="$(SYNC_ROOT="$T/root" SYNC_HELD_FILE=/dev/null bash "$T/root/gs-bootstrap/tools/sync_checkouts.sh")"
 check "report mode leaves stale untouched" '[ "$(git -C "$T/root/stale" rev-list --count HEAD..origin/main)" = 2 ]'
 check "report mode names the stale checkout" 'grep -q "stale: .*stale" <<< "$out"'
 check "report mode leaves tag" '[ "$(git -C "$T/root/moved" rev-parse v1)" = "$old" ]'
-out="$(SYNC_ROOT="$T/root" SYNC_HELD_FILE=/dev/null bash "$T/root/dot-bootstrap/tools/sync_checkouts.sh" --apply)"
+out="$(SYNC_ROOT="$T/root" SYNC_HELD_FILE=/dev/null bash "$T/root/gs-bootstrap/tools/sync_checkouts.sh" --apply)"
 check "stale reset to origin/main" '[ "$(git -C "$T/root/stale" rev-parse HEAD)" = "$(git -C "$T/root/stale" rev-parse origin/main)" ]'
 check "stale local commit kept on salvage branch" '[ -n "$(git -C "$T/root/stale" branch --list "salvage/*")" ]'
 check "new content not reset" '[ "$(git -C "$T/root/newcontent" rev-parse HEAD)" = "$newcontent_head" ]'

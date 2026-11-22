@@ -37,7 +37,7 @@ Name what you want and it brings what that needs, and nothing else.
 ./bootstrap.sh --only wipeout                   # one game with its addons, weapons and maps
 ./bootstrap.sh --only fatal-contact,playlot     # short names; several at once
 ./bootstrap.sh --only 'mg-*'                    # a wildcard
-./bootstrap.sh --only dot-weapon --no-deps      # just that repository
+./bootstrap.sh --only gs-weapon --no-deps      # just that repository
 ./bootstrap.sh mg-wipeout --min                 # no content packs
 ./bootstrap.sh --plan zees-games                # print what would happen, change nothing
 ```
@@ -79,17 +79,17 @@ You can play a converted map folder or `.zip` without publishing it. Name it `<m
 - In a source checkout, put it in `res://addons/maps`.
 - Drag it onto the window of a game that calls `GSMapLocalMaps.watch_drops` (Fatal Contact does).
 
-It shows as `<title> (local)` and plays solo only. See [dot-map docs/content.md](https://github.com/gamespice-platform/map/blob/main/docs/content.md).
+It shows as `<title> (local)` and plays solo only. See [gs-map docs/content.md](https://github.com/gamespice-platform/map/blob/main/docs/content.md).
 
 ### Art for converted maps
 
 Some games draw converted maps with shared textures and models that are in no repository. Without them the maps still play with low-detail stand-ins and the load screen says "Low-detail art". Players get the art as GameSpice Cloud slices from a server that publishes them. A developer stages it once (about 2 GB):
 
 ```bash
-dot-map-convert/tools/stage_stores.sh zombie-zone-maps --from dev02:godot/zombie-zone-maps/.stores --game game-zombie-zone
+gs-map-convert/tools/stage_stores.sh zombie-zone-maps --from dev02:godot/zombie-zone-maps/.stores --game game-zombie-zone
 ```
 
-This is not part of a plain sync because it is a large download. Details: [dot-map docs/content.md](https://github.com/gamespice-platform/map/blob/main/docs/content.md#without-the-slices).
+This is not part of a plain sync because it is a large download. Details: [gs-map docs/content.md](https://github.com/gamespice-platform/map/blob/main/docs/content.md#without-the-slices).
 
 ## How the scripts know what to link
 
@@ -107,11 +107,11 @@ There are no hard-coded lists in the scripts, because lists in several places go
 
 ## Windows copies, Linux links
 
-`bootstrap.sh` makes relative symlinks. `bootstrap.ps1` copies each addon folder, because Godot 4.7 does not register `class_name` scripts through Windows junctions (`-Junction` opts back in; `--copy` on Linux copies). After a `git pull` on Windows, re-run `.\bootstrap.ps1 -Links`. If Git checks a symlink out as a plain file (`core.symlinks` false on Windows), `addons\dot_core` becomes a tiny text file and every `class_name` fails to resolve.
+`bootstrap.sh` makes relative symlinks. `bootstrap.ps1` copies each addon folder, because Godot 4.7 does not register `class_name` scripts through Windows junctions (`-Junction` opts back in; `--copy` on Linux copies). After a `git pull` on Windows, re-run `.\bootstrap.ps1 -Links`. If Git checks a symlink out as a plain file (`core.symlinks` false on Windows), `addons\gs_core` becomes a tiny text file and every `class_name` fails to resolve.
 
 ## Keeping stock Valve files out of commits
 
-Stock Valve and Source assets (`.vpk`, `.vtf`, `.vmt`, `.mdl`, `.vvd`, `.vtx`, `.phy`, `.ani`, a `textures/orig` folder) never belong in a repository or a published pack. dot-cloud's `tools/check_valve_files.py` refuses them and CI runs it everywhere. To refuse them at commit time too:
+Stock Valve and Source assets (`.vpk`, `.vtf`, `.vmt`, `.mdl`, `.vvd`, `.vtx`, `.phy`, `.ani`, a `textures/orig` folder) never belong in a repository or a published pack. gs-cloud's `tools/check_valve_files.py` refuses them and CI runs it everywhere. To refuse them at commit time too:
 
 ```bash
 tools/install-valve-hooks.sh                 # every repository in ./projects
@@ -119,7 +119,7 @@ tools/install-valve-hooks.sh /path/to/dir    # any directory of repositories
 tools/install-valve-hooks.sh --check         # list repositories without the hook
 ```
 
-`bootstrap.sh` runs this on every sync. The hook needs `dot-cloud` cloned next to the others; set `GS_CLOUD=/path` if it is elsewhere. Git worktrees share their repository's hooks.
+`bootstrap.sh` runs this on every sync. The hook needs `gs-cloud` cloned next to the others; set `GS_CLOUD=/path` if it is elsewhere. Git worktrees share their repository's hooks.
 
 ## Fetching content
 
@@ -146,23 +146,23 @@ Download lists in `cfg/content/addons.yml` and `games.yml` (and `cfg/server/cont
 
 ## Publishing from a fresh clone
 
-dot-cloud refuses unsigned manifests, because a mounted pack can contain scripts. A fresh clone can consume the team's content but cannot publish its own, since private keys are never in a repository. Run:
+gs-cloud refuses unsigned manifests, because a mounted pack can contain scripts. A fresh clone can consume the team's content but cannot publish its own, since private keys are never in a repository. Run:
 
 ```bash
 ./bootstrap.sh --content-keys     # or .\bootstrap.ps1 -ContentKeys
 ```
 
-This gives the machine its own key and rewrites `dot-server-deploy/client/content.json` to trust it. That leaves the file locally modified, so do not commit it.
+This gives the machine its own key and rewrites `gs-server-deploy/client/content.json` to trust it. That leaves the file locally modified, so do not commit it.
 
 ## Tools the importers use
 
-`--tools` installs fastgmad, the extractor for `.gma` addon archives. dot-map-convert's BSP importer runs it. It is found through `DOTBSP_FASTGMAD`, then `PATH`, then `~/.local/bin/fastgmad`. It is opt-in so a plain sync needs only git.
+`--tools` installs fastgmad, the extractor for `.gma` addon archives. gs-map-convert's BSP importer runs it. It is found through `GSBSP_FASTGMAD`, then `PATH`, then `~/.local/bin/fastgmad`. It is opt-in so a plain sync needs only git.
 
 | Tool | Author | Licence |
 | --- | --- | --- |
 | [fastgmad 0.2.1](https://github.com/WilliamVenner/fastgmad) | William Venner | Apache-2.0 |
 
-The release zip is checked against a pinned SHA-256 before it is unpacked into `~/.local/share/fastgmad-0.2.1` (`GS_TOOLS_PREFIX` changes the prefix). Linux x86_64 and macOS are supported (macOS untested). On Windows it unpacks into `%LOCALAPPDATA%\fastgmad\0.2.1`, which you must put on `PATH` or point `DOTBSP_FASTGMAD` at (untested).
+The release zip is checked against a pinned SHA-256 before it is unpacked into `~/.local/share/fastgmad-0.2.1` (`GS_TOOLS_PREFIX` changes the prefix). Linux x86_64 and macOS are supported (macOS untested). On Windows it unpacks into `%LOCALAPPDATA%\fastgmad\0.2.1`, which you must put on `PATH` or point `GSBSP_FASTGMAD` at (untested).
 
 ## Maintainer tools in `tools/`
 

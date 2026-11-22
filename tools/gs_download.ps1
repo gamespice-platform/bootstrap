@@ -1,4 +1,4 @@
-# The one downloader for bootstrap.ps1 and tools/fetch_lock.ps1 (dot-source it). Windows PowerShell 5.1 and pwsh 7.
+# The one downloader for bootstrap.ps1 and tools/fetch_lock.ps1 (gs-source it). Windows PowerShell 5.1 and pwsh 7.
 #   Invoke-GSDownload <url> <file> [-Name n] [-Progress p] [-Resume]   stream <url> to <file> (256 KB buffer)
 #   $p = New-GSProgress <name> [-Total bytes] [-Files n]; $p.File = i; Write-GSProgress $p [-Final]   one line for many files
 # Its own progress, never PowerShell's: Invoke-WebRequest's progress bar slows a 5.1 download to a crawl, and with the
@@ -7,7 +7,6 @@
 # tick prints nothing. A connection that sends no byte for 60 s ($env:GS_DOWNLOAD_STALL) fails instead of hanging;
 # the callers keep their own retries and hash checks. -Resume continues an existing <file> with a Range request.
 Add-Type -AssemblyName System.Net.Http
-foreach ($e in Get-ChildItem env:DOT_*) { $g = 'GS_' + $e.Name.Substring(4); if (-not (Test-Path "env:$g")) { Set-Item "env:$g" $e.Value; if (-not $env:GS_QUIET_DEPRECATION) { [Console]::Error.WriteLine("WARN: $($e.Name) is deprecated, use $g") } } }  # old DOT_* names still work
 $script:GSHttp = $null
 
 function Get-GSStallSeconds { $s = $env:GS_DOWNLOAD_STALL -as [int]; if ($s -gt 0) { $s } else { 60 } }
@@ -22,7 +21,7 @@ function Get-GSHttp {
         $c = New-Object System.Net.Http.HttpClient($h)
         $c.Timeout = [TimeSpan]::FromSeconds((Get-GSStallSeconds))  # until the response headers; the body has its own check
         # Cloudflare refuses some agents (error 1010) on dev.dotgames.org; the same agent as fetch_lock.sh.
-        [void]$c.DefaultRequestHeaders.UserAgent.TryParseAdd('dot-bootstrap-fetch-lock/1')
+        [void]$c.DefaultRequestHeaders.UserAgent.TryParseAdd('gs-bootstrap-fetch-lock/1')
         $script:GSHttp = $c
     }
     $script:GSHttp

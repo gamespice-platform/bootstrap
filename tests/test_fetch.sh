@@ -30,12 +30,12 @@ sleep 1
 hits() { grep -c 'GET' "$T/log$1" 2>/dev/null || true; }
 reset() { : > "$T/log18101"; : > "$T/log18102"; : > "$T/log18103"; rm -rf "$T/repoA/.alpha" "$T/repoA/.beta" "$T/repoB/.alpha" "$T/repoB/.beta"; }
 
-# Copy the tools so dot-bootstrap/.env can be written beside them.
-mkdir -p "$T/dot-bootstrap" && cp -r "$SRC/tools" "$T/dot-bootstrap/"
-F="$T/dot-bootstrap/tools/fetch_lock.sh"; L="$T/repoA/content.lock.json"
+# Copy the tools so gs-bootstrap/.env can be written beside them.
+mkdir -p "$T/gs-bootstrap" && cp -r "$SRC/tools" "$T/gs-bootstrap/"
+F="$T/gs-bootstrap/tools/fetch_lock.sh"; L="$T/repoA/content.lock.json"
 unset GS_CDN_URL GS_PACKS_FROM
 
-reset; echo "GS_CDN_URL=http://127.0.0.1:18102" > "$T/dot-bootstrap/.env"
+reset; echo "GS_CDN_URL=http://127.0.0.1:18102" > "$T/gs-bootstrap/.env"
 GS_CDN_URL=http://127.0.0.1:18103 "$F" "$L" --cdn http://127.0.0.1:18101 >/dev/null 2>&1
 [ "$(hits 18101)" -gt 0 ] && [ "$(hits 18102)" = 0 ] && [ "$(hits 18103)" = 0 ]; ok "arg beats env and .env" $?
 
@@ -45,7 +45,7 @@ reset; GS_CDN_URL=http://127.0.0.1:18103 "$F" "$L" >/dev/null 2>&1
 reset; "$F" "$L" >/dev/null 2>&1
 [ "$(hits 18102)" -gt 0 ] && [ "$(hits 18101)" = 0 ] && [ -f "$T/repoA/.alpha/f.txt" ]; ok ".env beats lock origin and fetches" $?
 
-reset; rm "$T/dot-bootstrap/.env"; "$F" "$L" >/dev/null 2>&1
+reset; rm "$T/gs-bootstrap/.env"; "$F" "$L" >/dev/null 2>&1
 [ ! -f "$T/repoA/.alpha/f.txt" ]; ok "no override: dead lock origin fetches nothing" $?
 
 # --only / --except
@@ -62,7 +62,7 @@ reset; mkdir -p "$T/repoA/cfg/content"; printf 'remove:\n  - o/zz-beta\n' > "$T/
 rm -rf "$T/repoA/cfg"
 
 # fetch_all over two repos
-reset; "$T/dot-bootstrap/tools/fetch_all.sh" --projects "$T" --cdn http://127.0.0.1:18101 --only repoB --except zz-beta >/dev/null 2>&1
+reset; "$T/gs-bootstrap/tools/fetch_all.sh" --projects "$T" --cdn http://127.0.0.1:18101 --only repoB --except zz-beta >/dev/null 2>&1
 [ -f "$T/repoB/.alpha/f.txt" ] && [ ! -e "$T/repoB/.beta" ] && [ ! -e "$T/repoA/.alpha" ]; ok "fetch_all --only repo --except pack" $?
 
 # per-origin manifest hash: the lock pins a "prod" hash (wrong for this CDN); manifest_sha256_by_origin names the right one for it

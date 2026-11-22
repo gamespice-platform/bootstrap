@@ -34,90 +34,90 @@
 #
 # TWO OWNERS, and the split is a rule rather than a set of accidents: the official
 # addons are the organisation's (`gamespice-platform/*`, the dot- prefix dropped) and the games, and any addon
-# that is the author's own (dot-radio), are theirs (`zees-games/`). That is why the URL is written out per line here instead of being
+# that is the author's own (gs-radio), are theirs (`zees-games/`). That is why the URL is written out per line here instead of being
 # derived from the name -- the name says what a project IS, not who owns it, and a
 # derivation would have to encode the split in two places. setup.sh's repo_url()
 # encodes the same rule for the one case that cannot read this file: a fresh box
-# cloning the sources it needs before dot-bootstrap is on it.
+# cloning the sources it needs before gs-bootstrap is on it.
 #
 # A project named game-* has a playable client: `bootstrap --play <name>`.
-dot-2d	git@github.com:gamespice-platform/2d.git
-dot-achievements	git@github.com:gamespice-platform/achievements.git
-dot-audio	git@github.com:gamespice-platform/audio.git
-dot-auth	git@github.com:gamespice-platform/auth.git
-dot-bot	git@github.com:gamespice-platform/bot.git
-dot-bot-record	git@github.com:gamespice-platform/bot-record.git
-dot-bot-learn	git@github.com:gamespice-platform/bot-learn.git
-dot-browser	git@github.com:gamespice-platform/browser.git
-dot-chat	git@github.com:gamespice-platform/chat.git
-dot-ci	git@github.com:gamespice-platform/ci.git
-dot-cloud	git@github.com:gamespice-platform/cloud.git
-dot-combat	git@github.com:gamespice-platform/combat.git
-dot-console	git@github.com:gamespice-platform/console.git
-dot-core	git@github.com:gamespice-platform/core.git
-dot-economy	git@github.com:gamespice-platform/economy.git
-dot-effects	git@github.com:gamespice-platform/effects.git
-dot-entity	git@github.com:gamespice-platform/entity.git
-dot-friends	git@github.com:gamespice-platform/friends.git
-dot-fx	git@github.com:gamespice-platform/fx.git
-dot-flashlight	git@github.com:gamespice-platform/flashlight.git
-dot-game	git@github.com:gamespice-platform/game.git
-dot-game-template	git@github.com:gamespice-platform/game-template.git
-dot-inventory	git@github.com:gamespice-platform/inventory.git
-dot-leaderboard	git@github.com:gamespice-platform/leaderboard.git
-dot-lighting	git@github.com:gamespice-platform/lighting.git
-dot-loadout	git@github.com:gamespice-platform/loadout.git
-dot-locale	git@github.com:gamespice-platform/locale.git
-dot-log	git@github.com:gamespice-platform/log
-dot-map	git@github.com:gamespice-platform/map.git
-dot-map-convert	git@github.com:gamespice-platform/map-convert.git
-dot-match	git@github.com:gamespice-platform/match.git
-dot-matchmaking	git@github.com:gamespice-platform/matchmaking.git
-dot-menu	git@github.com:gamespice-platform/menu.git
-dot-mobile	git@github.com:gamespice-platform/mobile.git
-dot-moderation	git@github.com:gamespice-platform/moderation
-dot-net	git@github.com:gamespice-platform/net.git
-dot-npc	git@github.com:gamespice-platform/npc.git
-dot-npc-ai	git@github.com:gamespice-platform/npc-ai.git
-dot-npc-ai-director	git@github.com:gamespice-platform/npc-ai-director.git
-dot-objective	git@github.com:gamespice-platform/objective.git
-dot-party	git@github.com:gamespice-platform/party.git
-dot-peer-to-peer	git@github.com:gamespice-platform/peer-to-peer.git
-dot-physics	git@github.com:gamespice-platform/physics.git
-dot-platform	git@github.com:gamespice-platform/platform.git
-dot-player	git@github.com:gamespice-platform/player.git
-dot-player-char	git@github.com:gamespice-platform/player-char.git
-dot-player-class	git@github.com:gamespice-platform/player-class.git
-dot-player-controller	git@github.com:gamespice-platform/player-controller.git
-dot-procedural-generation	git@github.com:gamespice-platform/procedural-generation.git
-dot-profile	git@github.com:gamespice-platform/profile.git
-dot-profiler	git@github.com:gamespice-platform/profiler.git
-dot-props	git@github.com:gamespice-platform/props.git
-dot-replay	git@github.com:gamespice-platform/replay.git
-dot-serve	git@github.com:gamespice-platform/serve.git
-dot-server	git@github.com:gamespice-platform/server.git
-dot-server-deploy	git@github.com:gamespice-platform/server-deploy.git
-dot-server-query	git@github.com:gamespice-platform/server-query.git
-dot-server-security	git@github.com:gamespice-platform/server-security.git
-dot-settings	git@github.com:gamespice-platform/settings.git
-dot-sim	git@github.com:gamespice-platform/sim.git
-dot-spawn	git@github.com:gamespice-platform/spawn.git
-dot-spectate	git@github.com:gamespice-platform/spectate.git
-dot-sql	git@github.com:gamespice-platform/sql
-dot-stats	git@github.com:gamespice-platform/stats
-dot-team	git@github.com:gamespice-platform/team.git
-dot-timer	git@github.com:gamespice-platform/timer.git
-dot-ui	git@github.com:gamespice-platform/ui.git
-dot-user	git@github.com:gamespice-platform/user.git
-dot-user-avatar	git@github.com:gamespice-platform/user-avatar.git
-dot-vehicle	git@github.com:gamespice-platform/vehicle.git
-dot-voice	git@github.com:gamespice-platform/voice.git
-dot-vote	git@github.com:gamespice-platform/vote.git
-dot-weapon	git@github.com:gamespice-platform/weapon.git
-dot-workbench	git@github.com:gamespice-platform/workbench.git
-dot-weather	git@github.com:gamespice-platform/weather.git
-dot-radio	git@github.com:zees-games/dot-radio.git
-dot-trail	git@github.com:zees-games/dot-trail.git
+gs-2d	git@github.com:gamespice-platform/2d.git	dot-2d
+gs-achievements	git@github.com:gamespice-platform/achievements.git	dot-achievements
+gs-audio	git@github.com:gamespice-platform/audio.git	dot-audio
+gs-auth	git@github.com:gamespice-platform/auth.git	dot-auth
+gs-bot	git@github.com:gamespice-platform/bot.git	dot-bot
+gs-bot-record	git@github.com:gamespice-platform/bot-record.git	dot-bot-record
+gs-bot-learn	git@github.com:gamespice-platform/bot-learn.git	dot-bot-learn
+gs-browser	git@github.com:gamespice-platform/browser.git	dot-browser
+gs-chat	git@github.com:gamespice-platform/chat.git	dot-chat
+gs-ci	git@github.com:gamespice-platform/ci.git	dot-ci
+gs-cloud	git@github.com:gamespice-platform/cloud.git	dot-cloud
+gs-combat	git@github.com:gamespice-platform/combat.git	dot-combat
+gs-console	git@github.com:gamespice-platform/console.git	dot-console
+gs-core	git@github.com:gamespice-platform/core.git	dot-core
+gs-economy	git@github.com:gamespice-platform/economy.git	dot-economy
+gs-effects	git@github.com:gamespice-platform/effects.git	dot-effects
+gs-entity	git@github.com:gamespice-platform/entity.git	dot-entity
+gs-friends	git@github.com:gamespice-platform/friends.git	dot-friends
+gs-fx	git@github.com:gamespice-platform/fx.git	dot-fx
+gs-flashlight	git@github.com:gamespice-platform/flashlight.git	dot-flashlight
+gs-game	git@github.com:gamespice-platform/game.git	dot-game
+gs-game-template	git@github.com:gamespice-platform/game-template.git	dot-game-template
+gs-inventory	git@github.com:gamespice-platform/inventory.git	dot-inventory
+gs-leaderboard	git@github.com:gamespice-platform/leaderboard.git	dot-leaderboard
+gs-lighting	git@github.com:gamespice-platform/lighting.git	dot-lighting
+gs-loadout	git@github.com:gamespice-platform/loadout.git	dot-loadout
+gs-locale	git@github.com:gamespice-platform/locale.git	dot-locale
+gs-log	git@github.com:gamespice-platform/log	dot-log
+gs-map	git@github.com:gamespice-platform/map.git	dot-map
+gs-map-convert	git@github.com:gamespice-platform/map-convert.git	dot-map-convert
+gs-match	git@github.com:gamespice-platform/match.git	dot-match
+gs-matchmaking	git@github.com:gamespice-platform/matchmaking.git	dot-matchmaking
+gs-menu	git@github.com:gamespice-platform/menu.git	dot-menu
+gs-mobile	git@github.com:gamespice-platform/mobile.git	dot-mobile
+gs-moderation	git@github.com:gamespice-platform/moderation	dot-moderation
+gs-net	git@github.com:gamespice-platform/net.git	dot-net
+gs-npc	git@github.com:gamespice-platform/npc.git	dot-npc
+gs-npc-ai	git@github.com:gamespice-platform/npc-ai.git	dot-npc-ai
+gs-npc-ai-director	git@github.com:gamespice-platform/npc-ai-director.git	dot-npc-ai-director
+gs-objective	git@github.com:gamespice-platform/objective.git	dot-objective
+gs-party	git@github.com:gamespice-platform/party.git	dot-party
+gs-peer-to-peer	git@github.com:gamespice-platform/peer-to-peer.git	dot-peer-to-peer
+gs-physics	git@github.com:gamespice-platform/physics.git	dot-physics
+gs-platform	git@github.com:gamespice-platform/platform.git	dot-platform
+gs-player	git@github.com:gamespice-platform/player.git	dot-player
+gs-player-char	git@github.com:gamespice-platform/player-char.git	dot-player-char
+gs-player-class	git@github.com:gamespice-platform/player-class.git	dot-player-class
+gs-player-controller	git@github.com:gamespice-platform/player-controller.git	dot-player-controller
+gs-procedural-generation	git@github.com:gamespice-platform/procedural-generation.git	dot-procedural-generation
+gs-profile	git@github.com:gamespice-platform/profile.git	dot-profile
+gs-profiler	git@github.com:gamespice-platform/profiler.git	dot-profiler
+gs-props	git@github.com:gamespice-platform/props.git	dot-props
+gs-replay	git@github.com:gamespice-platform/replay.git	dot-replay
+gs-serve	git@github.com:gamespice-platform/serve.git	dot-serve
+gs-server	git@github.com:gamespice-platform/server.git	dot-server
+gs-server-deploy	git@github.com:gamespice-platform/server-deploy.git	dot-server-deploy
+gs-server-query	git@github.com:gamespice-platform/server-query.git	dot-server-query
+gs-server-security	git@github.com:gamespice-platform/server-security.git	dot-server-security
+gs-settings	git@github.com:gamespice-platform/settings.git	dot-settings
+gs-sim	git@github.com:gamespice-platform/sim.git	dot-sim
+gs-spawn	git@github.com:gamespice-platform/spawn.git	dot-spawn
+gs-spectate	git@github.com:gamespice-platform/spectate.git	dot-spectate
+gs-sql	git@github.com:gamespice-platform/sql	dot-sql
+gs-stats	git@github.com:gamespice-platform/stats	dot-stats
+gs-team	git@github.com:gamespice-platform/team.git	dot-team
+gs-timer	git@github.com:gamespice-platform/timer.git	dot-timer
+gs-ui	git@github.com:gamespice-platform/ui.git	dot-ui
+gs-user	git@github.com:gamespice-platform/user.git	dot-user
+gs-user-avatar	git@github.com:gamespice-platform/user-avatar.git	dot-user-avatar
+gs-vehicle	git@github.com:gamespice-platform/vehicle.git	dot-vehicle
+gs-voice	git@github.com:gamespice-platform/voice.git	dot-voice
+gs-vote	git@github.com:gamespice-platform/vote.git	dot-vote
+gs-weapon	git@github.com:gamespice-platform/weapon.git	dot-weapon
+gs-workbench	git@github.com:gamespice-platform/workbench.git	dot-workbench
+gs-weather	git@github.com:gamespice-platform/weather.git	dot-weather
+gs-radio	git@github.com:zees-games/gs-radio.git	dot-radio
+gs-trail	git@github.com:zees-games/gs-trail.git	dot-trail
 game-fatal-contact	git@github.com:zees-games/game-fatal-contact.git	game-arena,arena,final-contact,fc
 fc-surf-dm-maps	git@github.com:zees-games/fc-surf-dm-maps.git	arena-surf-dm-maps
 fc-dm-maps	git@github.com:zees-games/fc-dm-maps.git	arena-dm-maps
@@ -146,8 +146,8 @@ murder-mystery-maps	git@github.com:zees-games/murder-mystery-maps.git
 lam-maps	git@github.com:zees-games/lam-maps.git
 natural-disasters	git@github.com:zees-games/natural-disasters.git
 fc-weapons	git@github.com:zees-games/fc-weapons.git	arena-weapons
-zed-dot-weapons	git@github.com:zees-games/zed-dot-weapons.git
-zee-dot-weapons	git@github.com:zees-games/zee-dot-weapons.git
+zed-gs-weapons	git@github.com:zees-games/zed-gs-weapons.git	zed-dot-weapons
+zee-gs-weapons	git@github.com:zees-games/zee-gs-weapons.git	zee-dot-weapons
 zombie-zone-maps	git@github.com:zees-games/zombie-zone-maps.git
 zz-modern-weapons	git@github.com:zees-games/zz-modern-weapons.git
 zz-medieval-weapons	git@github.com:zees-games/zz-medieval-weapons.git
