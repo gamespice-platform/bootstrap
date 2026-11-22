@@ -73,6 +73,7 @@ var g := ["dot.bot", &"dot.trail", "dot.position", `dot.${k}`]
 var v := "Protocol: dot.v1 v.dot.v2"
 var h := "from dotbsp import x DOTBSP_PATH uid://dotcloud0bundle1 [a](#dotsignon) dotnet dotmap/dm_x dotenv dots"
 var e := "a\tdot_sim\ndot-net dot-$n dot_* '^dot-' ${r#dot-} \"dot-\""
+var m := "op = 'DOT_PRODUCT' dot_product(a, b) CROSS_DOT RED_DOT_AXIS sight_dot_for SIGHT_DOT Dot-Product dot_cross vec_dot"
 var c := "game-arena arena-weapons arena_weapons game-g2gfast g2gfast-maps arena-surf-dm-maps game-playground arena allocator"
 X
 printf 'dot-foo\tgit@x:o/dot-foo.git\n# dot-foo repos\nplain\tgit@x:o/plain.git\told-plain\n' > projects.tsv
@@ -80,6 +81,7 @@ git add -A && git commit -qm ids
 tool --phase all . >/dev/null
 f=addons/gs_foo/ids.gd
 check "phase 3 ids" 'grep -qF "user://gs_self_mute.json GS_SHOT_FRAMES gsDownload gsstats GSStatDef libgs_sim.so" $f'
+check "phase 3 keeps math and sight terms" 'grep -qF "op = '"'"'DOT_PRODUCT'"'"' dot_product(a, b) CROSS_DOT RED_DOT_AXIS sight_dot_for SIGHT_DOT Dot-Product dot_cross vec_dot" $f'
 check "phase 3 keeps words" 'grep -qF "red_dot red_dot_window dot_radius dot_sight dot_degrees v.dot(u) Godot dotted" $f'
 check "phase 3 after a \\t or \\n escape" 'grep -qF "a\tgs_sim\ngs-net gs-\$n gs_* '"'"'^gs-'"'"' \${r#gs-} \\\"gs-\\\"" $f'
 check "phase 3 channels" 'grep -qF "var g := [\"gs.bot\", &\"gs.trail\", \"gs.position\", \`gs.\${k}\`]" $f'

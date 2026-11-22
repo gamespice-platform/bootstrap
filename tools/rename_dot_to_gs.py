@@ -180,7 +180,15 @@ class Phase2:
         return text
 
 
-KEEP_RX = r"red[-_ ]dot|(?i:dot[-_](?:radius|sight|colou?r|size|product|degrees|art)(?![a-z]))"
+# Words that merely contain "dot" and are not the old product name: the red dot sight, a crosshair dot, the math dot product
+# (Blender's VectorMath enum DOT_PRODUCT, Godot's Vector3.dot, glTF/shader helpers). Matched case-insensitively, so DOT_PRODUCT
+# and Dot-Product are safe too. PROTECTED_HEADS come before the dot (sight_dot_for), PROTECTED_TAILS after it (dot_product_x).
+PROTECTED_HEADS = ("red", "sight", "laser", "aim", "reticle", "hit", "center", "centre", "cross", "vec", "vector", "scalar",
+                   "inner", "safe", "triple", "normal")
+PROTECTED_TAILS = ("radius", "sight", "colou?r", "size", "product", "prod", "degrees", "art", "axis", "fade", "cross", "scalar",
+                   "vec", "vector", "normal")
+KEEP_RX = (r"red[-_ ]dot|(?i:(?:" + "|".join(PROTECTED_HEADS) + r")[-_]dot(?![a-z])"
+           r"|dot[-_](?:" + "|".join(PROTECTED_TAILS) + r")(?![a-z]))")
 OLD_NAMES = [  # (old, new): repository and directory names of the renamed games; longest first
     ("arena-surf-dm-maps", "fc-surf-dm-maps"), ("game-playground-maps", "playlot-maps"), ("arena-dm-maps", "fc-dm-maps"),
     ("game-playground", "game-playlot"), ("game-g2gfast", "game-airdrift"), ("g2gfast-maps", "airdrift-maps"),
