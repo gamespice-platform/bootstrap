@@ -70,6 +70,7 @@ cat > addons/gs_foo/ids.gd <<'X'
 var a := "user://dot_self_mute.json DOT_SHOT_FRAMES dotDownload dotstats DotStatDef libdot_sim.so"
 var b := "red_dot red_dot_window dot_radius dot_sight dot_degrees v.dot(u) Godot dotted"
 var g := ["dot.bot", &"dot.trail", "dot.position"]
+var v := "Protocol: dot.v1 v.dot.v2"
 var h := "from dotbsp import x DOTBSP_PATH uid://dotcloud0bundle1 [a](#dotsignon) dotnet dotmap/dm_x dotenv dots"
 var e := "a\tdot_sim\ndot-net dot-$n dot_* '^dot-' ${r#dot-} \"dot-\""
 var c := "game-arena arena-weapons arena_weapons game-g2gfast g2gfast-maps arena-surf-dm-maps game-playground arena allocator"
@@ -82,6 +83,7 @@ check "phase 3 ids" 'grep -qF "user://gs_self_mute.json GS_SHOT_FRAMES gsDownloa
 check "phase 3 keeps words" 'grep -qF "red_dot red_dot_window dot_radius dot_sight dot_degrees v.dot(u) Godot dotted" $f'
 check "phase 3 after a \\t or \\n escape" 'grep -qF "a\tgs_sim\ngs-net gs-\$n gs_* '"'"'^gs-'"'"' \${r#gs-} \\\"gs-\\\"" $f'
 check "phase 3 channels" 'grep -qF "var g := [\"gs.bot\", &\"gs.trail\", \"gs.position\"]" $f'
+check "phase 3 versioned protocol" 'grep -qF "Protocol: gs.v1 v.dot.v2" $f'
 check "phase 3 compound names" 'grep -qF "from gsbsp import x GSBSP_PATH uid://gscloud0bundle1 [a](#gssignon) gsnet dotmap/dm_x dotenv dots" $f'
 check "phase 3 old game names" 'grep -qF "game-fatal-contact fc-weapons fc_weapons game-airdrift airdrift-maps fc-surf-dm-maps game-playlot arena allocator" $f'
 check "phase 3 storage path" 'grep -q "user://gs_foo/save.cfg" addons/gs_foo/gs_foo.gd'

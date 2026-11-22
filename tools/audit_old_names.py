@@ -18,7 +18,7 @@ Every allowlist line needs a reason, and a line that allows nothing is reported 
 --republish prints the addon ids each repository pins in requires.pins.json (the packs that must be republished).
 Exit status: 0 clean, 1 leftovers or stale allowlist lines.
 """
-import argparse, fnmatch, json, os, re, sys
+import argparse, fnmatch, json, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -28,6 +28,14 @@ AUDIT_ONLY = re.compile(r"(?<![A-Za-z0-9])(g2g|G2G|arena-player|playground_map|A
 SELF = {"tools/rename_dot_to_gs.py", "tools/rename_dot_to_gs.json", "tests/test_rename_dot_to_gs.sh",
         "tools/audit_old_names.py", "tools/audit_old_names.allow", "tests/test_audit_old_names.sh"}
 DEFAULT_ROOT = os.path.expanduser("~/godot")
+MEDIA = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ktx", ".ktx2", ".dds", ".tga", ".bmp", ".exr", ".hdr", ".svgz",
+         ".ogg", ".wav", ".mp3", ".opus", ".flac", ".bin", ".bsp", ".vtf", ".mdl", ".vvd", ".vtx", ".phy", ".ttf", ".otf",
+         ".woff", ".woff2", ".zip", ".gz", ".xz", ".zst", ".pck", ".wasm"}
+BIN_ID = re.compile(rb"(?<![A-Za-z0-9])(dot_[a-z][a-z_]{2,}|dot-[a-z][a-z-]{2,}|Dot[A-Z][a-z]{2,})")
+
+
+def git_out(repo, *args):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout
 
 
 def checkouts(args):
@@ -87,11 +95,12 @@ def audit(repo, p3, rules, listing):
         path = os.path.join(repo, rel)
         text = read_text(path)
         if text is None and os.path.isfile(path) and not os.path.islink(path):
-            raw = open(path, "rb").read()
-            if re.search(rb"(?<![A-Za-z0-9])(dot_|dot-|Dot[A-Z])", raw) and not allowed(rules, name, rel, "binary:" + rel):
+            # pixels, samples and vertex buffers: a byte run that spells dot_ there is noise, not a name
+            raw = b"" if os.path.splitext(rel)[1].lower() in MEDIA else open(path, "rb").read()
+            if BIN_ID.search(raw) and not allowed(rules, name, rel, "binary:" + rel):
                 found.append(f"{name}/{rel}: binary carries an old id (rebuild or regenerate it)")
         elif text is None and os.path.islink(path):
-            target = os.readlink(path)
+            target = git_out(repo, "cat-file", "-p", ":" + rel)  # the committed target, not a local relink
             if any(hits_in(p3, target)) and not allowed(rules, name, rel, "link:" + target):
                 found.append(f"{name}/{rel}: link -> {target}")
         elif text:

@@ -193,6 +193,7 @@ class Phase3:
                     r"|(?<=\.config/)(?P<cfg>dot)(?![A-Za-z0-9])"
                     r"|" + B + r"(?P<id>dot|Dot|DOT)(?=[-_][A-Za-z0-9$*{}%\"'`/)\\])"  # also a prefix: "dot-$n", '^dot-', dot_*
                     r"|(?<=[\"'`])(?P<chan>dot)(?=\.[a-z])"  # a log channel or envelope kind: "dot.bot", &"dot.trail"
+                    r"|(?<![A-Za-z0-9.])(?P<ver>dot)(?=\.v[0-9])"  # a versioned subprotocol: Sec-WebSocket-Protocol: dot.v1
                     r"|" + B + r"(?P<cls>Dot)(?=[A-Z0-9])"
                     r"|" + B + r"(?P<camel>dot)(?=[A-Z]|stats)"
                     r"|" + B + r"(?P<comp>dot)(?=(?:" + COMPOUND + r")(?![a-z]))"  # dotbsp, dotserve, the dotnet namespace
