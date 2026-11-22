@@ -5,7 +5,7 @@
 
 Modes (default --write):
   --make-icons  crop each row's cover to a rounded square and write <game>/branding/icon_source.png (art step; run once or when the art changes)
-  --write       regenerate branding/icon.png, branding/icon.ico, branding/splash.png from icon_source.png and the name, and set the project.godot keys
+  --write       regenerate branding/icon.png, branding/icon.ico, branding/icon.icns (macOS), branding/splash.png from icon_source.png and the name, and set the project.godot keys
   --check       exit 1 when any generated file or project.godot key is stale (no files written)
 
 project.godot keys it owns: config/name, config/icon, config/windows_native_icon, boot_splash/{image,show_image,use_filter,bg_color,fullsize}.
@@ -99,11 +99,17 @@ def ico_bytes(img):
     return b.getvalue()
 
 
+def icns_bytes(img):
+    b = io.BytesIO()
+    img.save(b, "ICNS", sizes=[(s, s) for s in (16, 32, 64, 128, 256, 512)])
+    return b.getvalue()
+
+
 def pixels_equal(path, data):
     if not path.exists():
         return False
     a, b = Image.open(path), Image.open(io.BytesIO(data))
-    if path.suffix == ".ico":
+    if path.suffix in (".ico", ".icns"):
         return path.read_bytes() == data
     return a.size == b.size and a.convert("RGBA").tobytes() == b.convert("RGBA").tobytes()
 
@@ -163,6 +169,7 @@ def main():
             continue
         icon = Image.open(src).convert("RGBA")
         outs = {br / "icon.png": png_bytes(icon), br / "icon.ico": ico_bytes(icon),
+                br / "icon.icns": icns_bytes(icon),
                 br / "splash.png": png_bytes(make_splash(row, icon))}
         for p, data in outs.items():
             if a.check:
