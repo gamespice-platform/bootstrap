@@ -1,0 +1,22 @@
+# Internal CI (Forgejo, docs/forgejo-ci.md). Forgejo prefers .forgejo/workflows over .github/workflows, so this
+# file replaces ci.yml there: that one calls a reusable workflow in a private GitHub repo, which the internal
+# runner cannot resolve. Only the Linux fast checks live here; GitHub keeps running the full validate.
+name: ci
+on:
+    push:
+        branches: ['**']
+    workflow_dispatch:
+jobs:
+    fast:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Shell and Python parse
+              run: |
+                  set -e
+                  for f in bootstrap.sh tools/*.sh tests/*.sh; do bash -n "$f"; done
+                  python3 -I -m py_compile tools/*.py
+            - name: Project list readable
+              run: ./bootstrap.sh --list >/dev/null
+            - name: Python unit tests
+              run: python3 -I tools/test_agent_watch.py
