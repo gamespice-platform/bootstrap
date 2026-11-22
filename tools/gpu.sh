@@ -1090,6 +1090,13 @@ in_slice() { systemd-run --user --scope --quiet --collect --slice=gpu-suites.sli
 # The class cache stays here between runs; a stale one reads as "Identifier not declared".
 if [ "$kind" != tool ]; then
 ilog=$HOME/gpu/suite/$wsid.import.log
+# A class cache from before the GS rename lists Dot* classes (or an addon script is newer than it, `find -L` because
+# addons are symlinks): a plain --import keeps it and the run dies with "Could not find type GSHumanoidFigure".
+ccache=.godot/global_script_class_cache.cfg
+if [ -f "$ccache" ] && { grep -q 'class": &"Dot' "$ccache" || [ -n "$(find -L addons -name '*.gd' -newer "$ccache" -print -quit 2>/dev/null)" ]; }; then
+	echo "gpu.sh: stale class cache in $project, re-importing from scratch" >&2
+	rm -f "$ccache" .godot/uid_cache.bin
+fi
 in_slice nice -n 5 timeout 1800 "$GODOT" --headless --path . --import >"$ilog" 2>&1 </dev/null 6>&- 7>&- 9>&- {f}>&-
 # A stale class cache (a script gained a class_name or a member since the last run here) reads as
 # "Could not resolve external class member"; one import over a cleared cache fixes it, so retry once.
@@ -1565,7 +1572,12 @@ XSHIM
 chmod +x shot-shim/godot shot-shim/xvfb-run
 export XDG_RUNTIME_DIR=/run/user/$(id -u) SHOT_GPU_INDEX=$idx PATH=$HOME/gpu/shot-shim:$PATH
 cd "shot/$project" || exit 3
-# The class cache lives here between runs; a stale one reads as "Identifier not declared".
+# The class cache lives here between runs; a stale one reads as "Identifier not declared". One from before the GS rename
+# (Dot* classes) or older than an addon script (`find -L`: addons are symlinks) is dropped so the import rebuilds it.
+ccache=.godot/global_script_class_cache.cfg
+if [ -f "$ccache" ] && { grep -q 'class": &"Dot' "$ccache" || [ -n "$(find -L addons -name '*.gd' -newer "$ccache" -print -quit 2>/dev/null)" ]; }; then
+	rm -f "$ccache" .godot/uid_cache.bin
+fi
 nice -n 5 timeout 900 "$HOME/gpu/bin/godot" --headless --path . --import >/dev/null 2>&1 </dev/null 8>&- 9>&- {f}>&-
 touch ../"$project".stamp
 sleep 1
@@ -2112,7 +2124,7 @@ case "${1:-}" in
 		# first, headless, whenever the class cache is missing or a source is newer than it (new glbs left
 		# "Cannot open file .godot/imported/...scn" on a box that had imported before).
 		# Shared, not exclusive: an import needs no GPU and must not stop the box taking suites (remote_shared).
-		remote_shared "import.$project" bash -c "cd $(printf '%q' "$REMOTE_HOME/$REMOTE_ROOT/$project") && { [ -f .godot/global_script_class_cache.cfg ] && [ -z \"\$(find . -path ./.godot -prune -o \\( -name \"*.import\" -o -name \"*.glb\" -o -name \"*.gd\" \\) -newer .godot/global_script_class_cache.cfg -print -quit)\" ] || timeout 900 $REMOTE_HOME/gpu/bin/godot --headless --path . --import >/dev/null 2>&1 </dev/null; }; true" || return
+		remote_shared "import.$project" bash -c "cd $(printf '%q' "$REMOTE_HOME/$REMOTE_ROOT/$project") && { ! grep -q 'class\": &\"Dot' .godot/global_script_class_cache.cfg 2>/dev/null || rm -f .godot/global_script_class_cache.cfg .godot/uid_cache.bin; [ -f .godot/global_script_class_cache.cfg ] && [ -z \"\$(find -L . -path ./.godot -prune -o \\( -name \"*.import\" -o -name \"*.glb\" -o -name \"*.gd\" \\) -newer .godot/global_script_class_cache.cfg -print -quit)\" ] || timeout 900 $REMOTE_HOME/gpu/bin/godot --headless --path . --import >/dev/null 2>&1 </dev/null; }; true" || return
 		idx=$GPU_INDEX
 		[[ -n $idx ]] || idx=$("${SSHQ[@]}" "vulkaninfo --summary 2>/dev/null | awk '/^GPU[0-9]+:/ {g=substr(\$1,4)+0} /deviceName.*NVIDIA/ {print g; exit}'" 2>/dev/null) || true
 		local xrun=(xvfb-run -a -s "-screen 0 1920x1080x24")
