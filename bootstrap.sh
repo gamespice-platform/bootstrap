@@ -233,7 +233,7 @@ alias_pairs() {
 }
 # The listed name for a name that may be an old one: a legacy id -> its current name. A name
 # that is neither listed nor another name comes back unchanged. Games' .gitignore lines
-# (the legacy /addons/arena_weapons, "# bootstrap-link: <legacy id>-maps/maps") still say old names,
+# (the legacy /addons/fc_weapons, "# bootstrap-link: <legacy id>-maps/maps") still say old names,
 # so the addon rule and the content links go through this.
 canon() {
     projects | grep -qxF "$1" && { echo "$1"; return; }
@@ -302,7 +302,7 @@ optional_for() {
 # GameSpice Server Deploy, which vendors a copy of everything, ignores /addons/ whole.
 addon_source() {
     local addon="$1" src="${1//_/-}" d
-    # The listed name first (fc_weapons and its legacy arena_weapons are in fc-weapons),
+    # The listed name first (fc_weapons and its legacy fc_weapons are in fc-weapons),
     # then the raw one: a machine whose checkout has not been renamed yet still has it
     # under its old directory name.
     d="$(canon "$src")"
@@ -322,12 +322,12 @@ addon_source() {
 
 # An addon directory that was renamed: the legacy name for a current one, and back.
 # fc-weapons (Fatal Contact's weapons) holds addons/fc_weapons; its tags up to v1.4.51 and
-# games not moved yet still say addons/arena_weapons. A game is linked under the name its
+# games not moved yet still say addons/fc_weapons. A game is linked under the name its
 # .gitignore asks for while the fc-weapons checkout holds that name (the legacy one with a
 # warning naming the checkout's ref); a game and a checkout on different sides of the
 # rename are an error, never an alias, because each one's res:// paths name its own side.
-legacy_addon_dir() { case "$1" in fc_weapons) echo arena_weapons ;; esac; }
-current_addon_dir() { case "$1" in arena_weapons) echo fc_weapons ;; esac; }
+legacy_addon_dir() { case "$1" in fc_weapons) echo fc_weapons ;; esac; }
+current_addon_dir() { case "$1" in fc_weapons) echo fc_weapons ;; esac; }
 
 # --- Selecting -------------------------------------------------------------
 #
@@ -610,7 +610,7 @@ resolve_blocked_pull() {
 # link, not a linked worktree) of this project, the new name is free, and no process
 # is working in it. A dirty tree moves as it is -- a rename touches no file in it.
 # Afterwards every link beside the projects that went through the old name (a game's
-# addons/arena_weapons, maps/imported) is pointed at the new one, linked worktrees are
+# addons/fc_weapons, maps/imported) is pointed at the new one, linked worktrees are
 # repaired, and the old name is left as a link to the new one, so a path written
 # somewhere this cannot see (another worktree's link, a script, an editor's project
 # list) still arrives. Delete that link once nothing uses the old name.

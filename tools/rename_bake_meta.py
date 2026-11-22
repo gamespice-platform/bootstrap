@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Renames the dot_light_* meta keys in baked lightmaps (Godot RSCC/zstd binary .res) to gs_light_*,
+"""Renames the gs_light_* meta keys in baked lightmaps (Godot RSCC/zstd binary .res) to gs_light_*,
 byte for byte otherwise: a headless re-save would drop the Texture2DArray data.
 Usage: tools/rename_bake_meta.py <game>/lightmaps/*.res"""
 import struct,subprocess,sys
@@ -45,7 +45,7 @@ def rename_strings(d, mapping):
     if imp: struct.pack_into('<Q',out,imp_pos,imp+delta)
     return bytes(out),changed
 
-M = {'metadata/dot_light_fingerprint': 'metadata/gs_light_fingerprint', 'metadata/dot_light_components': 'metadata/gs_light_components', 'metadata/dot_light_out': 'metadata/gs_light_out'}
+M = {'metadata/gs_light_fingerprint': 'metadata/gs_light_fingerprint', 'metadata/gs_light_components': 'metadata/gs_light_components', 'metadata/gs_light_out': 'metadata/gs_light_out'}
 
 if __name__ == '__main__':
     for path in sys.argv[1:]:

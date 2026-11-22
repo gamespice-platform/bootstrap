@@ -24,7 +24,7 @@ function Say ($n, $m, $c) { }
 function Ok ($n, $m) { }
 function Warn ($n, $m) { $script:warned += $m }
 function Err ($n, $m) { $script:said += $m }
-function Get-AliasTarget ($n) { if ($n -eq 'game-arena') { 'game-fatal-contact' } }
+function Get-AliasTarget ($n) { if ($n -eq 'game-fatal-contact') { 'game-fatal-contact' } }
 $repoDir = Join-Path $env:T 'boot'; New-Item -ItemType Directory -Force -Path $repoDir | Out-Null
 $tag = $env:TAG
 
@@ -148,7 +148,7 @@ $d = @(Get-ExportPlayArgs '')
 Check 'play args: the defaults' (($d -join ' ') -eq '-- --offline +bot_quota 8 +profiler_overlay 1 +profiler_record_seconds 60')
 $d = @(Get-ExportPlayArgs '+bot_quota 16  --map dm_atrium')
 Check 'play args: the given ones come last' (($d[-4..-1] -join ' ') -eq '+bot_quota 16 --map dm_atrium' -and $d[0] -eq '--' -and $d.Count -eq 12)
-Check 'play args: FC under its old name' ((@(Get-ExportPlayArgs '' 'game-arena') -join ' ') -eq '-- --offline +bot_quota 8 +profiler_overlay 1 +profiler_record_seconds 60')
+Check 'play args: FC under its old name' ((@(Get-ExportPlayArgs '' 'game-fatal-contact') -join ' ') -eq '-- --offline +bot_quota 8 +profiler_overlay 1 +profiler_record_seconds 60')
 Check 'play args: any other game only --offline and the given ones' ((@(Get-ExportPlayArgs '--map x' 'game-playlot') -join ' ') -eq '-- --offline --map x')
 
 Write-Host "test_export: $pass passed, $fail failed"

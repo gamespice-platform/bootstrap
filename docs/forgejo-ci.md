@@ -30,10 +30,10 @@ Tags are never pushed, on purpose: release workflows trigger on `v*` tags and mu
 
 Forgejo reads `.github/workflows`, and prefers `.forgejo/workflows` when that directory exists. So a repo needs an override only where its GitHub workflow cannot run on the host runner:
 
-- it calls a reusable workflow in a private GitHub repo (`gamespice-platform/ci/...@v1`: every Godot repo and dot-bootstrap do; the runner has no GitHub credential, by design) - such repos show no Forgejo runs until the override exists or the `ci` repo is mirrored and referenced by URL;
+- it calls a reusable workflow in a private GitHub repo (`gamespice-platform/ci/...@v1`: every Godot repo and gs-bootstrap do; the runner has no GitHub credential, by design) - such repos show no Forgejo runs until the override exists or the `ci` repo is mirrored and referenced by URL;
 - it needs `sudo`, Windows, macOS, Docker, or a secret that exists only on GitHub (`PACKAGES_TOKEN`, `TMC_CLI_TOKEN`, signing keys).
 
-Today: dot-bootstrap (`.forgejo/workflows/ci.yml`: shell and python parse, project list, unit tests) and tmc-app (`.forgejo/workflows/ci.yml` on branch `nightly/internal-ci-forgejo-1`: `tmc-core` clippy and tests, the Windows cross-check; `web` only when repo variable `PACKAGES_ENABLED=true` and secret `PACKAGES_TOKEN` are set in Forgejo). website-city only has the Images workflow (GHCR push), which stays on GitHub.
+Today: gs-bootstrap (`.forgejo/workflows/ci.yml`: shell and python parse, project list, unit tests) and tmc-app (`.forgejo/workflows/ci.yml` on branch `nightly/internal-ci-forgejo-1`: `tmc-core` clippy and tests, the Windows cross-check; `web` only when repo variable `PACKAGES_ENABLED=true` and secret `PACKAGES_TOKEN` are set in Forgejo). website-city only has the Images workflow (GHCR push), which stays on GitHub.
 
 ## Mirrors, public repos and the injected overrides
 
@@ -45,7 +45,7 @@ Today: dot-bootstrap (`.forgejo/workflows/ci.yml`: shell and python parse, proje
 
 Fast checks only; suites run through heavy/hv. Install `shellcheck` on the box (done). Runner capacity is 2, so a burst of pushes queues; read results after `select count(*) from action_run where status in (5,6)` is 0.
 
-Genuinely red on source, not on the mechanism: game-template (stale `addons.lock`), profiler (JS eval at `dot_profiler_perf_report.gd:180`), server (comments/logging baselines), tmc-app (`web` needs `PACKAGES_TOKEN`, `tmc-core` rustfmt diff in `library.rs`, `gamespice-app` needs apt packages the runner cannot install).
+Genuinely red on source, not on the mechanism: game-template (stale `addons.lock`), profiler (JS eval at `gs_profiler_perf_report.gd:180`), server (comments/logging baselines), tmc-app (`web` needs `PACKAGES_TOKEN`, `tmc-core` rustfmt diff in `library.rs`, `gamespice-app` needs apt packages the runner cannot install).
 
 ## Reading results
 

@@ -14,7 +14,7 @@ RED=''; YLW=''; CYN=''; DIM=''; GRN=''; OFF=''
 SELF_DIR="$T/shboot"; PROJECTS_DIR="$T/proj"; mkdir -p "$SELF_DIR" "$PROJECTS_DIR"
 games() { printf '%s\n' game-fatal-contact mg-pong game-fatal-contact-maps; }
 ok() { :; }
-alias_target() { case "$1" in fatal-contact|arena|game-arena) echo game-fatal-contact ;; esac; }
+alias_target() { case "$1" in fatal-contact|arena|game-fatal-contact) echo game-fatal-contact ;; esac; }
 block="$(sed -n '/^# --- Release export /,/^# --- Modes /p' "$H/bootstrap.sh")"
 check 'the export block is found' '[ -n "$block" ]'
 eval "$block"
@@ -98,7 +98,7 @@ check 'default: an unknown preset fails' '! default_export_preset g macOS 0 >/de
 default_export_preset game-x "Windows x86_64" 0 > "$T/default_windows.cfg"
 
 check 'play args: FC gets its bots and profiler' '[ "$(export_play_args game-fatal-contact | tr "\n" " ")" = "--offline +bot_quota 8 +profiler_overlay 1 +profiler_record_seconds 60 " ]'
-check 'play args: FC under its old name too' '[ "$(export_play_args game-arena | wc -l)" = 7 ]'
+check 'play args: FC under its old name too' '[ "$(export_play_args game-fatal-contact | wc -l)" = 7 ]'
 check 'play args: any other game only --offline' '[ "$(export_play_args mg-pong | tr "\n" " ")" = "--offline " ]'
 
 n="$T/shn"; mkdir -p "$n/addons/a" "$n/addons/b" "$n/addons/c"

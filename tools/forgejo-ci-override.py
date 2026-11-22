@@ -79,7 +79,7 @@ for st in val["jobs"]["validate"]["steps"]:
         # checkout on pull): shown on the run, not failing it. Real fix stays on the board.
         st["continue-on-error"] = True
     if st.get("name", "").startswith("Check out the CI scripts"):
-        st["with"] = {"repository": "gamespice-platform/ci", "ref": "main", "path": "dot-ci"}
+        st["with"] = {"repository": "gamespice-platform/ci", "ref": "main", "path": "gs-ci"}
     steps.append(st)
 
 out = {"name": "ci", "on": {"push": {"branches": ["**"], "paths-ignore": ["**/*.md", "screenshots/**"]}, "workflow_dispatch": None},

@@ -336,16 +336,16 @@ function Get-GitignorePath ($proj) {
 }
 
 # Renamed addon directories, legacy -> current (bootstrap.sh's legacy_addon_dir): fc-weapons holds
-# addons/fc_weapons; its tags up to v1.4.51 and games not moved yet say addons/arena_weapons.
-$legacyAddonDirs = @{ 'arena_weapons' = 'fc_weapons' }
-$renamedAddonDirs = @{ 'arena_weapons' = 'fc_weapons'; 'fc_weapons' = 'arena_weapons' }
+# addons/fc_weapons; its tags up to v1.4.51 and games not moved yet say addons/fc_weapons.
+$legacyAddonDirs = @{ 'fc_weapons' = 'fc_weapons' }
+$renamedAddonDirs = @{ 'fc_weapons' = 'fc_weapons'; 'fc_weapons' = 'fc_weapons' }
 
 # Which repository an addon comes from. bootstrap.sh's addon_source has the reasoning:
 # the name rule misses a game's own pack (zee_weapons is in zee-gs-weapons), so ask the
 # checkouts for the project that has the folder and does not ignore it.
 function Get-AddonSource ($addon) {
     $src = $addon -replace '_', '-'
-    # The listed name first (fc_weapons and its legacy arena_weapons are in fc-weapons), then the raw, old one.
+    # The listed name first (fc_weapons and its legacy fc_weapons are in fc-weapons), then the raw, old one.
     $c = Get-Canon $src
     if (Test-Path (Join-Path $projectsDir "$c\addons\$addon")) { return $c }
     if (Test-Path (Join-Path $projectsDir "$src\addons\$addon")) { return $src }
