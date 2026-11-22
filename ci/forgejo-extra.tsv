@@ -1,0 +1,4 @@
+# Repos mirrored to Forgejo that are not in projects.tsv. Columns: name<TAB>clone URL.
+tmc-app	git@github.com:gamespice-platform/app.git
+website-city	git@github.com:modcommunity/website-city.git
+bootstrap	git@github.com:gamespice-platform/bootstrap.git
