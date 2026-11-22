@@ -25,7 +25,7 @@ if [ -s "$tmp/found" ]; then
 else
     # not a validate caller: copy the workflows that use setup-python, minus that step (release workflows stay on GitHub)
     n=0
-    for f in $(git ls-tree -r --name-only "refs/heads/$br" -- .github/workflows | grep -E '\.ya?ml$' | grep -v release); do
+    for f in $(git ls-tree -r --name-only "refs/heads/$br" -- .github/workflows | grep -E '\.ya?ml$' | grep -v -e release -e validate.yml); do
         git show "refs/heads/$br:$f" > "$tmp/w.yml"
         python3 -I "$here/tools/forgejo-ci-override.py" --plain "$tmp/w.yml" > "$tmp/w.out" 2>/dev/null || continue
         git update-index --add --cacheinfo "100644,$(git hash-object -w "$tmp/w.out"),.forgejo/workflows/$(basename "$f")"; n=$((n+1))

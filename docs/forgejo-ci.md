@@ -35,6 +35,18 @@ Forgejo reads `.github/workflows`, and prefers `.forgejo/workflows` when that di
 
 Today: dot-bootstrap (`.forgejo/workflows/ci.yml`: shell and python parse, project list, unit tests) and tmc-app (`.forgejo/workflows/ci.yml` on branch `nightly/internal-ci-forgejo-1`: `tmc-core` clippy and tests, the Windows cross-check; `web` only when repo variable `PACKAGES_ENABLED=true` and secret `PACKAGES_TOKEN` are set in Forgejo). website-city only has the Images workflow (GHCR push), which stays on GitHub.
 
+## Mirrors, public repos and the injected overrides
+
+`tools/forgejo-mirror.sh` creates the orgs and repos as public inside Forgejo (127.0.0.1 only, sign-in required to reach it), so the job token can read sibling repos such as `gamespice-platform/ci`. It pushes from a bare cache, never tags. Before each push `tools/forgejo-inject-ci.sh` adds one commit to the cache only (never GitHub) with `.forgejo/workflows`, built by `tools/forgejo-ci-override.py`:
+
+- a repo that calls the private reusable `gamespice-platform/ci` validate.yml gets it flattened into `ci.yml` (Forgejo rejects `workflow_call` with `secrets`): inputs resolved, Godot runtime/profile/perf steps, `actions/cache` and `apt-get` dropped, `ci` checked out from the Forgejo copy at `main`;
+- any other non-release workflow that uses setup-python or apt-get gets the same workflow with those steps removed (the host runner has no toolcache and no sudo), `on:` kept valid, and `ref: main` added to sibling checkouts (Forgejo's checkout cannot look up a default branch);
+- the tracked-absolute-symlink check runs but does not fail the run (`continue-on-error`): those are dev-box addon links; untracking them would delete them from every checkout on pull. The real fix is per repo and stays on the board.
+
+Fast checks only; suites run through heavy/hv. Install `shellcheck` on the box (done). Runner capacity is 2, so a burst of pushes queues; read results after `select count(*) from action_run where status in (5,6)` is 0.
+
+Genuinely red on source, not on the mechanism: game-template (stale `addons.lock`), profiler (JS eval at `dot_profiler_perf_report.gd:180`), server (comments/logging baselines), tmc-app (`web` needs `PACKAGES_TOKEN`, `tmc-core` rustfmt diff in `library.rs`, `gamespice-app` needs apt packages the runner cannot install).
+
 ## Reading results
 
 `tools/ci-red-forgejo.sh` reads slugs on stdin and prints `slug<TAB>green|red|cancelled|running|none|absent`. `tools/ci-red.sh` (and nightly's `chk-ci-red.sh`) use it first. Only repos with no Forgejo run (`none`) or not mirrored (`absent`) fall back to GitHub, cached `CI_RED_GH_TTL` seconds (default 900); `CI_RED_GITHUB` now defaults to 0 (no GitHub call at all; set 1 to allow the fallback). Do not poll `gh run`: read this.
