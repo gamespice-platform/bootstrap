@@ -37,7 +37,7 @@ Today: dot-bootstrap (`.forgejo/workflows/ci.yml`: shell and python parse, proje
 
 ## Reading results
 
-`tools/ci-red-forgejo.sh` reads slugs on stdin and prints `slug<TAB>green|red|cancelled|running|none|absent`. `tools/ci-red.sh` (and nightly's `chk-ci-red.sh`) use it first. Only repos with no Forgejo run (`none`) or not mirrored (`absent`) fall back to GitHub, cached `CI_RED_GH_TTL` seconds (default 900); `CI_RED_GITHUB=0` forbids any GitHub call. Do not poll `gh run`: read this.
+`tools/ci-red-forgejo.sh` reads slugs on stdin and prints `slug<TAB>green|red|cancelled|running|none|absent`. `tools/ci-red.sh` (and nightly's `chk-ci-red.sh`) use it first. Only repos with no Forgejo run (`none`) or not mirrored (`absent`) fall back to GitHub, cached `CI_RED_GH_TTL` seconds (default 900); `CI_RED_GITHUB` now defaults to 0 (no GitHub call at all; set 1 to allow the fallback). Do not poll `gh run`: read this.
 
 The UI/API: `http://127.0.0.1:3300/<owner>/<repo>/actions`; `GET /api/v1/repos/<owner>/<repo>/actions/tasks`.
 

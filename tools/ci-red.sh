@@ -2,7 +2,7 @@
 # Latest completed CI run on each default branch for every repo in projects.tsv (+ ci/forgejo-extra.tsv); prints red and cancelled ones.
 # Source order per repo: (1) the internal Forgejo via tools/ci-red-forgejo.sh, zero GitHub calls (docs/forgejo-ci.md);
 # (2) only when Forgejo has no run for it, GitHub via gh, with the answer cached CI_RED_GH_TTL seconds (default 900) so a
-# repeated sweep spends no GitHub quota. CI_RED_GITHUB=0 never calls GitHub (those repos print "unmirrored").
+# repeated sweep spends no GitHub quota. CI_RED_GITHUB defaults to 0: never calls GitHub (those repos print "unmirrored").
 # Uses ssh dev01 when gh is missing or logged out here. Ignores the Images workflow (SHARED_PACKAGES_TOKEN).
 set -uo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
@@ -23,7 +23,7 @@ gh_ok=-1
 gh_state() { # slug -> "state<TAB>jobs<TAB>url", cached
     local slug="$1" f="$cdir/${1//\//__}" br run id concl wf jobs
     if [ -f "$f" ] && [ $(( $(date +%s) - $(stat -c %Y "$f") )) -lt "$ttl" ]; then cat "$f"; return; fi
-    [ "${CI_RED_GITHUB:-1}" = 0 ] && { printf 'unmirrored\t\t\n'; return; }
+    [ "${CI_RED_GITHUB:-0}" = 0 ] && { printf 'unmirrored\t\t\n'; return; }
     if [ "$gh_ok" = -1 ]; then gh auth status >/dev/null 2>&1 && gh_ok=1 || gh_ok=0; fi
     [ "$gh_ok" = 1 ] || { printf 'unmirrored\t\t\n'; return; }
     br="$(gh api "repos/$slug" --jq .default_branch 2>/dev/null)" || { printf 'unknown\t\t\n'; return; }
