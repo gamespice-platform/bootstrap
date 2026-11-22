@@ -1,0 +1,19 @@
+# repo glob	path glob	regex the line must match	reason (tools/audit_old_names.py)
+*	*	"dotbot-policy"	a hash salt in gs_bot_policy: renaming it reshuffles every seeded bot's draw
+*	*	&"dot_(bot|bot_aim|bot_style|bot_names|weather)"	GSRandomStream seed keys: the stream seed is the name's hash, so renaming it reshuffles every bot and sky
+*	*	bhop_g2g|surf_g2g|kz_g2g|deathrun_g2g	published Source map ids, the mappers' own names
+*	*	\bg2g-[a-z0-9]+(-[a-z0-9]+)*-[0-9]+\b|fgr-g2g-|g2g-routes|g2g-frot	nightly item keys: board history links by key
+*	*	/extra/g2g-ref|\bg2g/	folders outside git (the reference textures and the map source tree on the build host)
+*	*	(?<![A-Za-z0-9])(g2g|G2G)	Airdrift's short g2g ids (stat, award and board ids stored in the prod database, log channels, the G2G_* and --g2g-* fallbacks): nightly gs-rename-g2g-1
+*	*	arena-player-	the loadout and look key: stored, and hashed into each player's look
+*	*	playground_map	the kind id inside every published Playlot map file: nightly gs-rename-g2g-1 (with a map republish)
+*bootstrap*	*	arena[-_]weapons|game-arena	bootstrap's migration of the old checkout and addon dirs (and its tests): goes when arena-weapons retires
+*server-deploy*	*	arena[-_]weapons	the legacy addons/arena_weapons link and pack id: goes when arena-weapons retires
+*ci*	*	arena[-_]weapons	resolve-deps maps the legacy arena_weapons dir: goes when arena-weapons retires
+*arena-weapons*	*	arena[-_]weapons	the retiring repository itself
+*fatal-contact*	*	arena_weapons|game_arena	the cfg/addons/game_arena_weapons operator folder: goes when arena-weapons retires
+*website-city*	*	(?i)dotnet	Microsoft .NET (a build kind and its env vars), not the GS prefix
+*website-city*	*pack-rename*	dot-	maps the published modcommunity/dot-* pack ids to their new ids
+*playlot-maps*	maps/world/.stores/model-library/own/*.glb	^binary:	the glTF generator stamp dot-map-convert: regenerated with the next box rebuild
+*website-city*	scripts/rename-packs-gamespice.ts	dot-	applies the pack rename to the published dot-* pack ids
+*server-deploy*	*	game-arena|game-playground|arena-dm-maps|arena-surf-dm-maps	RETIRED_DIRS/RETIRED_IDS migrate live servers' cfg dirs and server.yml ids that still say these; drop once none do (nightly gs-rename-g2g-1)

@@ -31,7 +31,7 @@ DEFAULT_ROOT = os.path.expanduser("~/godot")
 MEDIA = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ktx", ".ktx2", ".dds", ".tga", ".bmp", ".exr", ".hdr", ".svgz",
          ".ogg", ".wav", ".mp3", ".opus", ".flac", ".bin", ".bsp", ".vtf", ".mdl", ".vvd", ".vtx", ".phy", ".ttf", ".otf",
          ".woff", ".woff2", ".zip", ".gz", ".xz", ".zst", ".pck", ".wasm"}
-BIN_ID = re.compile(rb"(?<![A-Za-z0-9])(dot_[a-z][a-z_]{2,}|dot-[a-z][a-z-]{2,}|Dot[A-Z][a-z]{2,})")
+BIN_ID = re.compile(rb"(?<![A-Za-z0-9_])(dot_[a-z][a-z_]{2,}|dot-[a-z][a-z-]{2,}|Dot[A-Z][a-z]{2,})")
 
 
 def git_out(repo, *args):
