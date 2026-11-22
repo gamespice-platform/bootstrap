@@ -26,7 +26,8 @@ from rename_dot_to_gs import Phase3, read_text, git_files  # noqa: E402
 
 AUDIT_ONLY = re.compile(r"(?<![A-Za-z0-9])(g2g|G2G|arena-player|playground_map|Arena Weapons|Final Contact)(?![a-z])")
 SELF = {"tools/rename_dot_to_gs.py", "tools/rename_dot_to_gs.json", "tests/test_rename_dot_to_gs.sh",
-        "tools/audit_old_names.py", "tools/audit_old_names.allow", "tests/test_audit_old_names.sh"}
+        "tools/audit_old_names.py", "tools/audit_old_names.allow", "tests/test_audit_old_names.sh",
+        "tools/rename_bake_meta.py"}
 DEFAULT_ROOT = os.path.expanduser("~/godot")
 MEDIA = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ktx", ".ktx2", ".dds", ".tga", ".bmp", ".exr", ".hdr", ".svgz",
          ".ogg", ".wav", ".mp3", ".opus", ".flac", ".bin", ".bsp", ".vtf", ".mdl", ".vvd", ".vtx", ".phy", ".ttf", ".otf",
