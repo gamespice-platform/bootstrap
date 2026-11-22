@@ -430,8 +430,15 @@ sync_ws() { local wsid=$1; shift; sync_tree "$PROJ_DIR" "$project" "ws/$wsid/$pr
 # the copy with a warning; other dangling or looping links stop it through the failure command.
 sync_dir_once() {
 	local d=$1 n=$2 fail=${3:-die}; shift 3 || shift $#
+	sync_loopsafe "$d" "$n" "${REMOTE_ROOT#gpu/}/$n" "$fail" "$@"
+}
+
+# sync_loopsafe <dir> <name> <dest> <failure command> [rsync filter args]: sync_tree with self-looping links left out
+# (warning) and other dangling or looping links stopped through the failure command. Every copy path goes through it, so
+# a stray loop link can no longer make the tree unhashable (shot_on once called sync_tree directly).
+sync_loopsafe() {
+	local d=$1 n=$2 dest=$3 fail=$4; shift 4
 	local bad loops=() ll xl=("$@")
-	# Same loop handling as offer_on: a self-looping link is left out of the copy with a warning, not a die.
 	while IFS= read -r ll; do
 		[[ -n $ll ]] || continue
 		loops+=("$ll"); xl+=(--exclude "/$ll")
@@ -440,7 +447,7 @@ sync_dir_once() {
 	bad=$(unresolved_except_loops "$d" "${loops[@]}")
 	[[ -z $bad ]] || $fail "$d has links that dangle or loop, so --copy-links cannot copy it to $BOX (rsync would stop with rc 23). Fix or remove them:
 $(sed 's/^/  /' <<<"$bad")"
-	sync_tree "$d" "$n" "${REMOTE_ROOT#gpu/}/$n" "${xl[@]}"
+	sync_tree "$d" "$n" "$dest" "${xl[@]}"
 }
 
 sync_project() {
@@ -1616,7 +1623,7 @@ shot_on() {
 	if [[ -z $reply ]]; then mark_down "$down" >/dev/null; exit 76; else rm -f "$down"; fi
 	[[ $reply == OK ]] || { [[ ${GPU_OFFER_VERBOSE:-0} == 1 ]] && echo "gpu.sh: $BOX: $reply" >&2; exit 75; }
 	local rs=(-e "$RSH")
-	sync_tree "$SHOT_DIR" "$project" "shot/$project" || { rc=$?; echo "gpu.sh: copying $project to $BOX failed" >&2; (( rc != 3 )) || { echo "gpu.sh: ERROR the tree cannot be hashed, so no box can take it; NOT falling back to llvmpipe" >&2; exit 3; }; exit 75; }
+	sync_loopsafe "$SHOT_DIR" "$project" "shot/$project" return || { rc=$?; echo "gpu.sh: copying $project to $BOX failed" >&2; (( rc != 3 )) || { echo "gpu.sh: ERROR the tree cannot be hashed, so no box can take it; NOT falling back to llvmpipe" >&2; exit 3; }; exit 75; }
 	for d in "${SHOT_STAGE[@]}"; do
 		"${SSHQ[@]}" "mkdir -p $(printf '%q' "$d")" && rsync -az "${rs[@]}" "$d/" "$HOST:$d/" || exit 75
 	done

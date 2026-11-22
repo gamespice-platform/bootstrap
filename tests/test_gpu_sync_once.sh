@@ -12,7 +12,7 @@ fail=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fail=1; }
 
-fns=$(sed -n '/^tree_hash() {/,/^}/p;/^read -r -d .. WS_FROM_SRC/,/^EOF$/p;/^box_lock() {/,/^}/p;/^box_unlock() {/,/^}/p;/^sync_tree() {/,/^}/p;/^sync_ws() {/p;/^sync_dir_once() {/,/^}/p;/^loop_links() {/,/^}/p;/^unresolved_links() {/,/^}/p;/^unresolved_except_loops() {/,/^}/p' "$src")
+fns=$(sed -n '/^tree_hash() {/,/^}/p;/^read -r -d .. WS_FROM_SRC/,/^EOF$/p;/^box_lock() {/,/^}/p;/^box_unlock() {/,/^}/p;/^sync_tree() {/,/^}/p;/^sync_ws() {/p;/^sync_dir_once() {/,/^}/p;/^sync_loopsafe() {/,/^}/p;/^loop_links() {/,/^}/p;/^unresolved_links() {/,/^}/p;/^unresolved_except_loops() {/,/^}/p' "$src")
 [[ $fns == *"tree_hash() {"* && $fns == *WS_FROM_SRC* && $fns == *"sync_ws() {"* && $fns == *"box_lock() {"* && $fns == *"sync_tree() {"* ]] || { echo "FAIL could not cut the sync code out of $src"; exit 1; }
 
 box=$root/box
@@ -58,7 +58,7 @@ rsync() {
 	command rsync "${a[@]}"
 }
 '"$fns"'
-case "${SYNC_FN:-}" in sync_tree) sync_tree "$PROJ_DIR" proj "$@" ;; sync_dir_once) REMOTE_ROOT=gpu/godot; sync_dir_once "$PROJ_DIR" proj die ;; *) sync_ws "$@" ;; esac' _ "$ws" "${EXARGS[@]}"
+case "${SYNC_FN:-}" in sync_tree) sync_tree "$PROJ_DIR" proj "$@" ;; sync_dir_once) REMOTE_ROOT=gpu/godot; sync_dir_once "$PROJ_DIR" proj die ;; shot) sync_loopsafe "$PROJ_DIR" proj shot/proj return ;; *) sync_ws "$@" ;; esac' _ "$ws" "${EXARGS[@]}"
 }
 uploads() { cat "$root/uploads" 2>/dev/null | wc -l; }
 same() { # same <wsid>: the workspace holds exactly the tree (less .godot/screenshots/excluded links)
@@ -174,5 +174,12 @@ out=$(run_sync x SYNC_FN=sync_dir_once 2>&1); rc=$?
 rm "$p/dangling"; rm -rf "$box/gpu"; mkdir -p "$box/gpu"; rm -f "$root/uploads"
 out=$(run_sync x SYNC_FN=sync_dir_once GPU_SYNC_ONCE=0 2>&1); rc=$?
 [[ $rc == 0 && $(uploads) == 1 && ! -e $box/gpu/ws/proj~src ]] && psame && ok "publish copy, GPU_SYNC_ONCE=0: direct upload" || bad "publish ONCE=0: rc=$rc $out"
+
+# 16. shot_on's copy (sync_loopsafe, shot/<name>): a self-looping link must not make the tree unhashable (gpu-sh-symlink-loop)
+rm -rf "$box/gpu"; mkdir -p "$box/gpu"; rm -f "$root/uploads"
+[[ -L $p/maps/maps ]] || ln -s "$p/maps" "$p/maps/maps"
+out=$(run_sync x SYNC_FN=shot 2>&1); rc=$?
+[[ $rc == 0 && $out != *"cannot hash"* && $out == *WARNING* && $(uploads) == 1 && ! -e $box/gpu/shot/proj/maps/maps && -e $box/gpu/shot/proj/a.txt ]] &&
+	ok "shot copy: loop link left out with a warning, tree hashed and uploaded" || bad "shot copy: rc=$rc uploads=$(uploads) $out"
 
 exit $fail
