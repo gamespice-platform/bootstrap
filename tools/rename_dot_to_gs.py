@@ -188,7 +188,8 @@ PROTECTED_HEADS = ("red", "sight", "laser", "aim", "reticle", "hit", "center", "
 PROTECTED_TAILS = ("radius", "sight", "colou?r", "size", "product", "prod", "degrees", "art", "axis", "fade", "cross", "scalar",
                    "vec", "vector", "normal")
 KEEP_RX = (r"red[-_ ]dot|(?i:(?:" + "|".join(PROTECTED_HEADS) + r")[-_]dot(?![a-z])"
-           r"|dot[-_](?:" + "|".join(PROTECTED_TAILS) + r")(?![a-z]))")
+           r"|dot[-_](?:" + "|".join(PROTECTED_TAILS) + r")(?![a-z])"
+           r"|DOTNET(?![a-z])|(?<=/)dotnet(?![a-z])|dotnet(?=\s+(?:build|publish|restore|test|run|--)))")  # the .NET SDK, not Dot net
 OLD_NAMES = [  # (old, new): repository and directory names of the renamed games; longest first
     ("arena-surf-dm-maps", "fc-surf-dm-maps"), ("game-playground-maps", "playlot-maps"), ("arena-dm-maps", "fc-dm-maps"),
     ("game-playground", "game-playlot"), ("game-g2gfast", "game-airdrift"), ("g2gfast-maps", "airdrift-maps"),

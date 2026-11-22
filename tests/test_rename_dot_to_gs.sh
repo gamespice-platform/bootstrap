@@ -86,7 +86,7 @@ check "phase 3 keeps words" 'grep -qF "red_dot red_dot_window dot_radius dot_sig
 check "phase 3 after a \\t or \\n escape" 'grep -qF "a\tgs_sim\ngs-net gs-\$n gs_* '"'"'^gs-'"'"' \${r#gs-} \\\"gs-\\\"" $f'
 check "phase 3 channels" 'grep -qF "var g := [\"gs.bot\", &\"gs.trail\", \"gs.position\", \`gs.\${k}\`]" $f'
 check "phase 3 versioned protocol" 'grep -qF "Protocol: gs.v1 v.dot.v2" $f'
-check "phase 3 compound names" 'grep -qF "from gsbsp import x GSBSP_PATH uid://gscloud0bundle1 [a](#gssignon) gsnet dotmap/dm_x dotenv dots" $f'
+check "phase 3 compound names" 'grep -qF "from gsbsp import x GSBSP_PATH uid://gscloud0bundle1 [a](#gssignon) dotnet dotmap/dm_x dotenv dots" $f'
 check "phase 3 old game names" 'grep -qF "game-fatal-contact fc-weapons fc_weapons game-airdrift airdrift-maps fc-surf-dm-maps game-playlot arena allocator" $f'
 check "phase 3 storage path" 'grep -q "user://gs_foo/save.cfg" addons/gs_foo/gs_foo.gd'
 check "phase 3 projects.tsv alias" 'printf "gs-foo\tgit@x:o/gs-foo.git\tdot-foo\n# gs-foo repos\nplain\tgit@x:o/plain.git\told-plain\n" | diff -q - projects.tsv >/dev/null'
