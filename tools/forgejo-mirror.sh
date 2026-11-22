@@ -46,9 +46,9 @@ while IFS=$'\t' read -r name url _; do
     slug="$(slug_of "$url")"; owner="${slug%%/*}"; repo="${slug##*/}"
     if [ $list -eq 1 ]; then echo -e "$name\t$slug\t$owner/$repo"; continue; fi
     # org (201 created, 422 exists)
-    [ "$(api GET "/orgs/$owner")" = 200 ] || api POST /orgs "{\"username\":\"$owner\",\"visibility\":\"private\"}" >/dev/null
+    [ "$(api GET "/orgs/$owner")" = 200 ] || api POST /orgs "{\"username\":\"$owner\",\"visibility\":\"public\"}" >/dev/null
     if [ "$(api GET "/repos/$owner/$repo")" != 200 ]; then
-        c="$(api POST "/orgs/$owner/repos" "{\"name\":\"$repo\",\"private\":true,\"default_branch\":\"main\"}")"
+        c="$(api POST "/orgs/$owner/repos" "{\"name\":\"$repo\",\"private\":false,\"default_branch\":\"main\"}")"
         [ "$c" = 201 ] || { echo "FAIL $name: create repo http $c"; fail=1; continue; }
     fi
     api PATCH "/repos/$owner/$repo" '{"has_actions":true}' >/dev/null
@@ -63,6 +63,8 @@ while IFS=$'\t' read -r name url _; do
     # default branch follows GitHub's HEAD when known
     hb="$(git -C "$bare" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^\t ]*\).*#\1#p' | head -1)"
     [ -n "$hb" ] && git -C "$bare" symbolic-ref HEAD "refs/heads/$hb"
+    # Reusable-workflow callers: point them at the ci repo on this Forgejo (local commit, never on GitHub)
+    [ -n "$hb" ] && "$here/tools/forgejo-inject-ci.sh" "$bare" "$hb" >/dev/null
     if out="$(timeout 600 git -C "$bare" -c "http.extraHeader=Authorization: token $FORGEJO_TOKEN" \
             push -q --prune --force "$FORGEJO_URL/$owner/$repo.git" 'refs/heads/*:refs/heads/*' 2>&1)"; then
         [ -n "$hb" ] && api PATCH "/repos/$owner/$repo" "{\"default_branch\":\"$hb\"}" >/dev/null
