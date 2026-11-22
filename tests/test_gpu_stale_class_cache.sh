@@ -15,6 +15,6 @@ run() { project=p; eval "$snip" 2>/dev/null; }
 fresh; run;                       ck "fresh cache kept" '[ -f .godot/global_script_class_cache.cfg ]'
 fresh; printf '"class": &"DotX"\n' > .godot/global_script_class_cache.cfg; run
 ck "Dot* cache dropped" '[ ! -f .godot/global_script_class_cache.cfg ] && [ ! -f .godot/uid_cache.bin ]'
-fresh; touch "$tmp/real/gs_x/a.gd"; run
+fresh; touch -d "1 minute" "$tmp/real/gs_x/a.gd"; run
 ck "cache older than a symlinked addon script dropped" '[ ! -f .godot/global_script_class_cache.cfg ]'
 exit $((fail > 0))
