@@ -25,6 +25,7 @@ class DotInner:
 const NEW := preload("res://addons/dot_foo/dot_new.gd")
 var a: DotFooBar
 var b := DotBranchNew.new()  # declared only on this branch
+var r := "\bDotFoo\s"
 var c := "DotFoo_helper DotFoo* DotFooBa* red_dot dotstats Godot DotSubmitInput DotUnknownThing DotOldDoc"
 var d := DotInner.new()
 var p := "user://dot_foo/save.cfg"
@@ -43,6 +44,7 @@ check "class_name" 'grep -q "^class_name GSFoo$" $f'
 check "inner class and use" 'grep -q "^class GSInner:" $f && grep -q "GSInner.new()" $f'
 check "reference" 'grep -q "var a: GSFooBar" $f'
 check "branch-local class" 'grep -q "GSBranchNew.new()" $f && grep -q "class_name GSBranchNew" addons/dot_foo/dot_new.gd'
+check "after a \\b regex boundary" 'grep -qF "\\bGSFoo\\s" $f'
 check "suffix and wildcards" 'grep -q "GSFoo_helper GSFoo\* GSFooBa\*" $f'
 check "lookalikes stay" 'grep -q "red_dot dotstats Godot DotSubmitInput DotUnknownThing GSOldDoc" $f'
 check "rust struct" 'grep -q "pub struct GSSimThing" rust/lib.rs'
@@ -67,7 +69,9 @@ check "phase 2 second run changes nothing" '[ -z "$(git status --porcelain)" ]'
 cat > addons/gs_foo/ids.gd <<'X'
 var a := "user://dot_self_mute.json DOT_SHOT_FRAMES dotDownload dotstats DotStatDef libdot_sim.so"
 var b := "red_dot red_dot_window dot_radius dot_sight dot_degrees v.dot(u) Godot dotted"
-var e := "a\tdot_sim\ndot-net"
+var g := ["dot.bot", &"dot.trail", "dot.position"]
+var h := "from dotbsp import x DOTBSP_PATH uid://dotcloud0bundle1 [a](#dotsignon) dotnet dotmap/dm_x dotenv dots"
+var e := "a\tdot_sim\ndot-net dot-$n dot_* '^dot-' ${r#dot-} \"dot-\""
 var c := "game-arena arena-weapons arena_weapons game-g2gfast g2gfast-maps arena-surf-dm-maps game-playground arena allocator"
 X
 printf 'dot-foo\tgit@x:o/dot-foo.git\n# dot-foo repos\nplain\tgit@x:o/plain.git\told-plain\n' > projects.tsv
@@ -76,7 +80,9 @@ tool --phase all . >/dev/null
 f=addons/gs_foo/ids.gd
 check "phase 3 ids" 'grep -qF "user://gs_self_mute.json GS_SHOT_FRAMES gsDownload gsstats GSStatDef libgs_sim.so" $f'
 check "phase 3 keeps words" 'grep -qF "red_dot red_dot_window dot_radius dot_sight dot_degrees v.dot(u) Godot dotted" $f'
-check "phase 3 after a \\t or \\n escape" 'grep -qF "a\tgs_sim\ngs-net" $f'
+check "phase 3 after a \\t or \\n escape" 'grep -qF "a\tgs_sim\ngs-net gs-\$n gs_* '"'"'^gs-'"'"' \${r#gs-} \\\"gs-\\\"" $f'
+check "phase 3 channels" 'grep -qF "var g := [\"gs.bot\", &\"gs.trail\", \"gs.position\"]" $f'
+check "phase 3 compound names" 'grep -qF "from gsbsp import x GSBSP_PATH uid://gscloud0bundle1 [a](#gssignon) gsnet dotmap/dm_x dotenv dots" $f'
 check "phase 3 old game names" 'grep -qF "game-fatal-contact fc-weapons fc_weapons game-airdrift airdrift-maps fc-surf-dm-maps game-playlot arena allocator" $f'
 check "phase 3 storage path" 'grep -q "user://gs_foo/save.cfg" addons/gs_foo/gs_foo.gd'
 check "phase 3 projects.tsv alias" 'printf "gs-foo\tgit@x:o/gs-foo.git\tdot-foo\n# gs-foo repos\nplain\tgit@x:o/plain.git\told-plain\n" | diff -q - projects.tsv >/dev/null'

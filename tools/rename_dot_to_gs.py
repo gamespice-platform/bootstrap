@@ -39,7 +39,7 @@ DECL_PATTERNS = [  # (file glob, regex with the name in group 1)
     ("*.gd", re.compile(r"\[\s*\"(Dot[A-Z0-9]\w*)\",\s*\"[A-Z]\w*\",\s*\"res://")),  # [name, base, path] tables
     ("*.gd", re.compile(r"set_type_variation\(\s*&?\"(Dot[A-Z0-9]\w*)\"")),  # theme type variations
 ]
-TOKEN = re.compile(r"(?<![A-Za-z0-9])Dot([A-Z0-9][A-Za-z0-9_]*)(\*?)")
+TOKEN = re.compile(r"(?:(?<![A-Za-z0-9])|(?<=\\[ntrb]))Dot([A-Z0-9][A-Za-z0-9_]*)(\*?)")  # \b: a regex word boundary
 PROSE = [(re.compile(r"(?<![A-Za-z0-9])`Dot`"), "`GS`"), (re.compile(r"(?<![A-Za-z0-9])Dot\*"), "GS*")]
 BINARY_SNIFF = 8192
 NATIVE_EXT = (".so", ".dll", ".dylib", ".wasm", ".a", ".lib")  # binaries that can carry a class name
@@ -182,16 +182,23 @@ EMB = "|".join(f"[{w[0]}{w[0].lower()}]{w[1:]}" for w in (  # verbs and owners t
     "Count", "Add"))
 
 
-B = r"(?:(?<![A-Za-z0-9])|(?<=\\[ntr]))"  # a word start, also right after a \n, \t or \r escape in a string
+B = r"(?:(?<![A-Za-z0-9])|(?<=\\[ntrb]))"
+COMPOUND = ("bsp|serve|mlp|bot|hub|ci|shot|http|notice|example|cloud|server|auth|votefix[a-z0-9]*|mesh|props|materials"
+            "|restack|transport[a-z]*|map(?=_)|net(?!-)")  # dot + word names; dotmap/ (a published store folder) stays  # a word start, also right after a \n, \t or \r escape in a string
 
 
 class Phase3:
     RX = re.compile(r"(?P<keep>" + KEEP_RX + r")"
                     r"|(?<=lib)(?P<lib>dot)(?=_[a-z])"
                     r"|(?<=\.config/)(?P<cfg>dot)(?![A-Za-z0-9])"
-                    r"|" + B + r"(?P<id>dot|Dot|DOT)(?=[-_][A-Za-z0-9])"
+                    r"|" + B + r"(?P<id>dot|Dot|DOT)(?=[-_][A-Za-z0-9$*{}%\"'`/)\\])"  # also a prefix: "dot-$n", '^dot-', dot_*
+                    r"|(?<=[\"'`])(?P<chan>dot)(?=\.[a-z])"  # a log channel or envelope kind: "dot.bot", &"dot.trail"
                     r"|" + B + r"(?P<cls>Dot)(?=[A-Z0-9])"
                     r"|" + B + r"(?P<camel>dot)(?=[A-Z]|stats)"
+                    r"|" + B + r"(?P<comp>dot)(?=(?:" + COMPOUND + r")(?![a-z]))"  # dotbsp, dotserve, the dotnet namespace
+                    r"|" + B + r"(?P<compu>DOT)(?=(?:" + COMPOUND.upper() + r")(?![A-Z]))"  # DOTBSP_PATH, DOTSERVE_VERSION
+                    r"|(?<=uid://)(?P<uid>dot)(?=[a-z])"  # uid://dotcloud0bundle1
+                    r"|(?:(?<=\]\(#)|(?<=\.md#))(?P<anchor>dot)(?=[a-z])"  # a link to an old heading: (#dotsignon)
                     r"|(?<![A-Za-z0-9])(?P<emb>" + EMB + r")Dot(?![a-z])")  # ReadDotTable, isDot, ServerUserDot
     OLD = re.compile(B + r"(" + "|".join(re.escape(o) for o, _ in OLD_NAMES) + r")(?![A-Za-z0-9])")
     NEW = dict(OLD_NAMES)
