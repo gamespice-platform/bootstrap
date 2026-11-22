@@ -154,3 +154,19 @@ zz-medieval-weapons	git@github.com:zees-games/zz-medieval-weapons.git
 zz-historical-monsters	git@github.com:zees-games/zz-historical-monsters.git
 npc-bugged-up	git@github.com:zees-games/npc-bugged-up.git
 zz-ply-class-pack	git@github.com:zees-games/zz-ply-class-pack.git
+gs-animation	git@github.com:gamespice-platform/animation.git	dot-animation
+gs-anticheat	git@github.com:gamespice-platform/anticheat.git	dot-anticheat
+gs-camera	git@github.com:gamespice-platform/camera.git	dot-camera
+gs-editor	git@github.com:gamespice-platform/editor.git	dot-editor
+gs-emote	git@github.com:gamespice-platform/emote.git	dot-emote
+gs-hud	git@github.com:gamespice-platform/hud.git	dot-hud
+gs-input	git@github.com:gamespice-platform/input.git	dot-input
+gs-interact	git@github.com:gamespice-platform/interact.git	dot-interact
+gs-logic	git@github.com:gamespice-platform/logic.git	dot-logic
+gs-progression	git@github.com:gamespice-platform/progression.git	dot-progression
+gs-report	git@github.com:gamespice-platform/report.git	dot-report
+gs-save	git@github.com:gamespice-platform/save.git	dot-save
+gs-script	git@github.com:gamespice-platform/script.git	dot-script
+gs-store	git@github.com:gamespice-platform/store.git	dot-store
+gs-telemetry	git@github.com:gamespice-platform/telemetry.git	dot-telemetry
+gs-bootstrap	git@github.com:gamespice-platform/bootstrap.git	dot-bootstrap

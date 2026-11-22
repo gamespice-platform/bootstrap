@@ -77,6 +77,18 @@ def read_text(path):
         return None
 
 
+PRISMA_MODEL = re.compile(r"^model\s+Dot([A-Z0-9]\w*)", re.M)
+
+
+def scan_prisma_models(repo, skip):
+    found = set()
+    for rel in git_files(repo):
+        if rel.endswith(".prisma") and not skipped(rel, skip):
+            text = read_text(os.path.join(repo, rel))
+            found.update(PRISMA_MODEL.findall(text or ""))
+    return found
+
+
 def scan_decls(repo, skip):
     found = set()
     for rel in git_files(repo):
@@ -205,6 +217,11 @@ class Phase3:
     NEW = dict(OLD_NAMES)
     TO = {"dot": "gs", "Dot": "GS", "DOT": "GS"}
 
+    def __init__(self, accessors=()):
+        self.accessor = None  # Prisma client delegates: model DotFoo -> db.dotFoo, which must follow model GSFoo -> db.gSFoo
+        if accessors:
+            self.accessor = re.compile(r"(?<![A-Za-z0-9])dot(" + "|".join(sorted(map(re.escape, accessors), key=len, reverse=True)) + r")(?![A-Za-z0-9_])")
+
     def _sub(self, m):
         if m.group("keep"):
             return m.group(0)
@@ -215,6 +232,8 @@ class Phase3:
     def apply(self, text, rel=""):
         if os.path.basename(rel) == "projects.tsv":
             return "".join(self._tsv_line(l) for l in text.splitlines(True))
+        if self.accessor:
+            text = self.accessor.sub(lambda m: "gS" + m.group(1), text)
         return self.OLD.sub(lambda m: self.NEW[m.group(1)], self.RX.sub(self._sub, text))
 
     def _tsv_line(self, line):
@@ -237,7 +256,7 @@ def process(repo, mapping, phases, mode):
     names = (set(mapping["classes"]) | set(mapping["extra"]) | scan_decls(repo, skip)) - set(mapping["keep"])
     p1 = Phase1(names)
     p2 = Phase2(mapping["addons"], mapping["crates"]) if 2 in phases else None
-    p3 = Phase3() if 3 in phases else None
+    p3 = Phase3(scan_prisma_models(repo, skip)) if 3 in phases else None
     changed, binaries, moves, left = [], [], [], {}
     old_bytes = [n.encode() for n in names]
     for rel in git_files(repo):
