@@ -21,6 +21,12 @@ game names (OLD_NAMES) become the new ones. KEEP_RX lists the unrelated words th
 projects.tsv: a renamed first column keeps the old name in the alias column, so `bootstrap sync` moves old checkouts.
 "all" is phases 1 and 3. tools/audit_old_names.py checks the result over every repository.
 
+Protected lines: a line that carries the marker `gs-rename: keep` (a trailing comment in any syntax) is never rewritten, never
+reported by --check, and never reported by tools/audit_old_names.py. `gs-rename: keep-next` protects the line after the marker
+(JSON and other formats with no comments on the line itself); `gs-rename: keep-begin` ... `gs-rename: keep-end` protects the
+lines between (marker lines included). Use it for intentionally retained legacy ids (compat aliases, boot-migration sources),
+with a reason beside the marker. See docs/rename-keep-markers.md.
+
 Exit status: 0 done (or --check clean), 1 --check found old names, 2 usage error.
 """
 import argparse, fnmatch, json, os, re, subprocess, sys
@@ -43,6 +49,49 @@ TOKEN = re.compile(r"(?:(?<![A-Za-z0-9])|(?<=\\[ntrb]))Dot([A-Z0-9][A-Za-z0-9_]*
 PROSE = [(re.compile(r"(?<![A-Za-z0-9])`Dot`"), "`GS`"), (re.compile(r"(?<![A-Za-z0-9])Dot\*"), "GS*")]
 BINARY_SNIFF = 8192
 NATIVE_EXT = (".so", ".dll", ".dylib", ".wasm", ".a", ".lib")  # binaries that can carry a class name
+
+
+KEEP_MARK = re.compile(r"gs-rename:\s*keep(-next|-begin|-end)?(?![A-Za-z0-9-])")
+
+
+def protected_flags(lines):
+    """One bool per line: True when the line is protected by a gs-rename: keep marker."""
+    flags, block, nxt = [], False, False
+    for line in lines:
+        m = KEEP_MARK.search(line)
+        kind = m.group(1) if m else None
+        flags.append(block or nxt or bool(m))
+        nxt = kind == "-next"
+        if kind == "-begin":
+            block = True
+        elif kind == "-end":
+            block = False
+    return flags
+
+
+def rewrite_unprotected(text, fn):
+    """fn(text) applied to each run of unprotected lines; protected lines pass through untouched."""
+    if "gs-rename:" not in text:
+        return fn(text)
+    lines = text.splitlines(True)
+    out, run = [], []
+    for line, prot in zip(lines, protected_flags(lines)):
+        if prot:
+            if run:
+                out.append(fn("".join(run))); run = []
+            out.append(line)
+        else:
+            run.append(line)
+    if run:
+        out.append(fn("".join(run)))
+    return "".join(out)
+
+
+def unprotected_text(text):
+    if "gs-rename:" not in text:
+        return text
+    lines = text.splitlines(True)
+    return "".join(l for l, p in zip(lines, protected_flags(lines)) if not p)
 
 
 def git_files(repo):
@@ -282,13 +331,18 @@ def process(repo, mapping, phases, mode):
             if p3 and p3.apply(rel) != rel and os.path.lexists(path):
                 moves.append((rel, p3.apply(rel)))
             continue
-        new = p1.apply(text) if 1 in phases else text
-        if p2:
-            new = p2.apply(new, rel)
-        if p3:
-            new = p3.apply(new, rel)
+        def conv(t):
+            if 1 in phases:
+                t = p1.apply(t)
+            if p2:
+                t = p2.apply(t, rel)
+            if p3:
+                t = p3.apply(t, rel)
+            return t
+        new = rewrite_unprotected(text, conv)
         if mode == "check":
-            hits = (p1.leftovers(text) if 1 in phases else []) + (p3.leftovers(text) if p3 else [])
+            live = unprotected_text(text)
+            hits = (p1.leftovers(live) if 1 in phases else []) + (p3.leftovers(live) if p3 else [])
             if hits:
                 left[rel] = hits
         elif new != text:

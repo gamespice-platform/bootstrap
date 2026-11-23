@@ -17,4 +17,37 @@ for label, ok in [("model renamed", "model GSStatDef" in pr), ("delegate gS", "d
                   ("type key gS", "'gSStatDef'" in ts), ("mock key gS", "{ gSStatDef: {} }" in ts),
                   ("plain camel stays gs", "const gsStats = 1" in ts), ("no gsStatDef", "gsStatDef" not in ts)]:
     print(("ok   " if ok else "FAIL ") + label); fails += not ok
+
+
+# gs-rename: keep markers (trailing, keep-next, begin/end block); rerun idempotency; --check and audit accept them
+audit = os.path.join(here, "audit_old_names.py")
+with tempfile.TemporaryDirectory() as d:
+    d = os.path.join(d, "demo"); os.makedirs(d)
+    src = ("var a = \"dot-hub\"  # gs-rename: keep (legacy alias)\n"
+           "var b = \"dot-hub\"\n"
+           "# gs-rename: keep-next\n"
+           "var c = \"dot_cloud\"\n"
+           "var d = \"dot_cloud\"\n"
+           "# gs-rename: keep-begin\n"
+           "var e = \"dot-hub\"\n"
+           "var f = \"dot_cloud\"\n"
+           "# gs-rename: keep-end\n"
+           "var g = \"dot-hub\"\n")
+    open(d + "/a.gd", "w").write(src)
+    for c in (["init", "-q"], ["add", "."]):
+        subprocess.run(["git", "-C", d, *c], check=True)
+    m = r.load_mapping(r.DEFAULT_MAPPING)
+    r.process(d, m, (1, 3), "write")
+    once = open(d + "/a.gd").read()
+    r.process(d, m, (1, 3), "write")
+    twice = open(d + "/a.gd").read()
+    L = once.splitlines()
+    chk = r.process(d, m, (1, 3), "check")["left"]
+    au = subprocess.run([sys.executable, "-I", audit, "--allow", "/dev/null", d], capture_output=True, text=True)
+for label, ok in [("trailing marker keeps line", 'dot-hub' in L[0]), ("unmarked line renamed", L[1] == 'var b = "gs-hub"'),
+                  ("keep-next keeps next", 'dot_cloud' in L[3]), ("keep-next only one line", L[4] == 'var d = "gs_cloud"'),
+                  ("block keeps inner lines", 'dot-hub' in L[6] and 'dot_cloud' in L[7]), ("after block renamed", L[9] == 'var g = "gs-hub"'),
+                  ("rerun idempotent", once == twice), ("--check clean with markers", not chk),
+                  ("audit accepts marked lines", au.returncode == 0 and "0 leftovers" in au.stdout)]:
+    print(("ok   " if ok else "FAIL ") + label); fails += not ok
 sys.exit(1 if fails else 0)

@@ -10,6 +10,7 @@ tracked paths are checked too, and a binary whose bytes carry an old id is repor
 The patterns are rename_dot_to_gs.py's phase 3 (the same KEEP_RX words never count) plus AUDIT_ONLY: old-game ids the
 rename does not rewrite because a person decides (storage keys, published map and achievement ids, nightly keys).
 
+A line protected by a `gs-rename: keep` marker (see rename_dot_to_gs.py) is accepted without an allowlist line.
 A hit is allowed when a line of the allowlist (default tools/audit_old_names.allow) matches it:
   <repo glob> <TAB> <path glob> <TAB> <regex the line must match> <TAB> <reason>
 projects.tsv's third column (old dir names bootstrap sync migrates) is never counted.
@@ -22,7 +23,7 @@ import argparse, fnmatch, json, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from rename_dot_to_gs import Phase3, read_text, git_files  # noqa: E402
+from rename_dot_to_gs import Phase3, read_text, git_files, protected_flags  # noqa: E402
 
 AUDIT_ONLY = re.compile(r"(?<![A-Za-z0-9])(g2g|G2G|arena-player|playground_map|Arena Weapons|Final Contact)(?![a-z])")
 SELF = {"tools/rename_dot_to_gs.py", "tools/rename_dot_to_gs.json", "tests/test_rename_dot_to_gs.sh",
@@ -106,7 +107,11 @@ def audit(repo, p3, rules, listing):
                 found.append(f"{name}/{rel}: link -> {target}")
         elif text:
             tsv = os.path.basename(rel) == "projects.tsv"
-            for n, line in enumerate(text.splitlines(), 1):
+            lines = text.splitlines()
+            prot = protected_flags(lines)
+            for n, line in enumerate(lines, 1):
+                if prot[n - 1]:
+                    continue
                 if tsv and not line.startswith("#"):
                     line = "\t".join(line.split("\t")[:2])  # column 3 holds old names on purpose: bootstrap sync moves them
                 hs = list(hits_in(p3, line))
