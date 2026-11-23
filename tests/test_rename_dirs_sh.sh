@@ -42,20 +42,20 @@ mk() { # <repo> <setup in the seed>
     g -C "$T/seed-$1" add -A && g -C "$T/seed-$1" commit -q -m one && g -C "$T/seed-$1" push -q origin HEAD:main 2>/dev/null
     git -C "$T/remote/$1.git" symbolic-ref HEAD refs/heads/main
 }
-mk fc-weapons 'mkdir -p addons/fc_weapons && echo "extends Node" > addons/fc_weapons/w.gd'
+mk fc-weapons 'mkdir -p addons/arena_weapons && echo "extends Node" > addons/arena_weapons/w.gd'
 mk new-maps   'mkdir -p maps && echo a > maps/a.txt'
-mk game-fc    'printf "/addons/fc_weapons\n# bootstrap-link: old-maps/maps\n/maps/imported\n" > .gitignore && echo "[app]" > project.godot'
+mk game-fc    'printf "/addons/arena_weapons\n# bootstrap-link: old-maps/maps\n/maps/imported\n" > .gitignore && echo "[app]" > project.godot'
 mk other      'echo x > x.txt'
-printf 'game-fc\t%s\tgame-old\nfc-weapons\t%s\tfc-weapons\nnew-maps\t%s\told-maps\n' \
+printf 'game-fc\t%s\tgame-old\nfc-weapons\t%s\tarena-weapons\nnew-maps\t%s\told-maps\n' \
     "$T/remote/game-fc.git" "$T/remote/fc-weapons.git" "$T/remote/new-maps.git" > "$T/bs/projects.tsv"
 
 # Checkouts made before the rename, under the old names, linked the old way.
 old_tree() { # <projects dir>
     mkdir -p "$1"
     g clone -q "$T/remote/game-fc.git" "$1/game-old" 2>/dev/null
-    g clone -q "$T/remote/fc-weapons.git" "$1/fc-weapons" 2>/dev/null
+    g clone -q "$T/remote/fc-weapons.git" "$1/arena-weapons" 2>/dev/null
     g clone -q "$T/remote/new-maps.git" "$1/old-maps" 2>/dev/null
-    mkdir -p "$1/game-old/addons" && ln -s ../../fc-weapons/addons/fc_weapons "$1/game-old/addons/fc_weapons"
+    mkdir -p "$1/game-old/addons" && ln -s ../../arena-weapons/addons/arena_weapons "$1/game-old/addons/arena_weapons"
     mkdir -p "$1/game-old/maps" && ln -s ../../old-maps/maps "$1/game-old/maps/imported"
 }
 run() { # <projects dir> <VAR=value or ""> [bootstrap arguments]
@@ -72,8 +72,8 @@ check 'the game is under its new name'      '[ -d "$P/game-fc/.git" ] && [ ! -L 
 check 'the addon repository too'            '[ -d "$P/fc-weapons/.git" ] && [ -d "$P/new-maps/.git" ]'
 check 'uncommitted work moved with it'      '[ "$(cat "$P/game-fc/uncommitted.txt")" = work ]'
 check 'the rename is said, with the dirt'   'printf "%s" "$out" | grep -q "renamed from game-old (with its 1 uncommitted"'
-check 'the old name is a link to the new'   '[ "$(readlink "$P/game-old")" = game-fc ] && [ "$(readlink "$P/fc-weapons")" = fc-weapons ]'
-check 'the addon link goes through fc-weapons' 'readlink "$P/game-fc/addons/fc_weapons" | grep -q "/fc-weapons/" && [ -f "$P/game-fc/addons/fc_weapons/w.gd" ]'
+check 'the old name is a link to the new'   '[ "$(readlink "$P/game-old")" = game-fc ] && [ "$(readlink "$P/arena-weapons")" = fc-weapons ]'
+check 'the addon link goes through fc-weapons' 'readlink "$P/game-fc/addons/arena_weapons" | grep -q "/fc-weapons/" && [ -f "$P/game-fc/addons/arena_weapons/w.gd" ]'
 check 'the content link goes through new-maps' 'readlink "$P/game-fc/maps/imported" | grep -q "/new-maps/" && [ -f "$P/game-fc/maps/imported/a.txt" ]'
 check 'no second clone under an old name'   '[ "$(find "$P" -mindepth 2 -maxdepth 2 -name .git | wc -l)" -eq 3 ]'
 chk="$(run "$P" "" --check)"; crc=$?
@@ -84,31 +84,31 @@ check 'a second sync moves nothing'         '! printf "%s" "$out2" | grep -q "re
 
 # 2. A process working in the old folder: not moved, and the new name is not cloned.
 P="$T/p2"; old_tree "$P"
-(cd "$P/fc-weapons" && exec sleep 300) & holder=$!
+(cd "$P/arena-weapons" && exec sleep 300) & holder=$!
 sleep 0.3
 chk="$(run "$P" "" --check)"
-check '--check names the old checkout'      'printf "%s" "$chk" | grep -q "checked out under its old name fc-weapons"'
+check '--check names the old checkout'      'printf "%s" "$chk" | grep -q "checked out under its old name arena-weapons"'
 out="$(run "$P" "")"
 kill $holder 2>/dev/null; wait $holder 2>/dev/null; holder=
-check 'in use: left at the old name'        '[ -d "$P/fc-weapons/.git" ] && [ ! -L "$P/fc-weapons" ]'
+check 'in use: left at the old name'        '[ -d "$P/arena-weapons/.git" ] && [ ! -L "$P/arena-weapons" ]'
 check 'in use: no second clone'             '[ ! -e "$P/fc-weapons" ]'
 check 'in use: the reason is said'          'printf "%s" "$out" | grep -q "in use by process"'
-check 'in use: the addon still links'       '[ -f "$P/game-fc/addons/fc_weapons/w.gd" ]'
+check 'in use: the addon still links'       '[ -f "$P/game-fc/addons/arena_weapons/w.gd" ]'
 check 'the others still moved'              '[ -d "$P/game-fc/.git" ] && [ -d "$P/new-maps/.git" ]'
 
 # 3. GS_NO_RENAME=1 refuses every move and clones nothing beside them.
 P="$T/p3"; old_tree "$P"
 out="$(run "$P" GS_NO_RENAME=1)"
-check 'GS_NO_RENAME: nothing moved'        '[ -d "$P/game-old/.git" ] && [ -d "$P/fc-weapons/.git" ] && [ -d "$P/old-maps/.git" ]'
+check 'GS_NO_RENAME: nothing moved'        '[ -d "$P/game-old/.git" ] && [ -d "$P/arena-weapons/.git" ] && [ -d "$P/old-maps/.git" ]'
 check 'GS_NO_RENAME: nothing cloned'       '[ ! -e "$P/game-fc" ] && [ ! -e "$P/fc-weapons" ] && [ ! -e "$P/new-maps" ]'
 
 # 4. Both names already there: neither is touched, and the old one is reported.
 P="$T/p4"; old_tree "$P"
 g clone -q "$T/remote/fc-weapons.git" "$P/fc-weapons" 2>/dev/null
-echo mine > "$P/fc-weapons/mine.txt"
+echo mine > "$P/arena-weapons/mine.txt"
 out="$(run "$P" "")"
-check 'both: the old checkout is kept'      '[ -f "$P/fc-weapons/mine.txt" ] && [ ! -L "$P/fc-weapons" ]'
-check 'both: and reported'                  'printf "%s" "$out" | grep -q "an old checkout is still at fc-weapons"'
+check 'both: the old checkout is kept'      '[ -f "$P/arena-weapons/mine.txt" ] && [ ! -L "$P/arena-weapons" ]'
+check 'both: and reported'                  'printf "%s" "$out" | grep -q "an old checkout is still at arena-weapons"'
 
 # 5. A different repository under an old name is left alone; the listed one is cloned.
 P="$T/p5"; mkdir -p "$P"

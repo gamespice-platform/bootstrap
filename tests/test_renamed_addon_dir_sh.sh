@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A renamed addon directory, in bootstrap.sh: fc-weapons holds addons/fc_weapons, its old tags
-# (up to v1.4.51) addons/fc_weapons. A game is linked under the directory its .gitignore
+# (up to v1.4.51) addons/arena_weapons. A game is linked under the directory its .gitignore
 # names while the fc-weapons checkout holds it (the legacy one with a deprecation warning
 # naming the checkout's ref); a game and a checkout on different sides of the rename fail
 # the sync, and nothing is aliased. Local bare remotes only; nothing leaves $T.
@@ -45,7 +45,7 @@ setup() {
     rm -rf "$T/remote" "$T"/seed-*; mkdir -p "$T/remote"
     mk fc-weapons "mkdir -p addons/$1 && echo 'extends Node' > addons/$1/w.gd"
     mk game-fc    "printf '/addons/$2\n' > .gitignore && echo '[app]' > project.godot"
-    printf 'game-fc\t%s\nfc-weapons\t%s\tfc-weapons\n' "$T/remote/game-fc.git" "$T/remote/fc-weapons.git" > "$T/bs/projects.tsv"
+    printf 'game-fc\t%s\nfc-weapons\t%s\tarena-weapons\n' "$T/remote/game-fc.git" "$T/remote/fc-weapons.git" > "$T/bs/projects.tsv"
 }
 
 # 1. Both on the new name: linked, no warning.
@@ -56,24 +56,24 @@ check 'new: addons/fc_weapons is linked'    '[ -f "$P/game-fc/addons/fc_weapons/
 check 'new: no legacy warning'              '! printf "%s" "$out" | grep -q "legacy name"'
 
 # 2. Both still on the legacy name: linked while the checkout holds it, and warned about.
-setup fc_weapons fc_weapons; P="$T/p2"
+setup arena_weapons arena_weapons; P="$T/p2"
 out="$(run "$P")"; rc=$?
 check 'legacy: sync succeeds'               '[ $rc -eq 0 ]'
-check 'legacy: addons/fc_weapons linked' '[ -f "$P/game-fc/addons/fc_weapons/w.gd" ]'
-check 'legacy: deprecation names the dir'   'printf "%s" "$out" | grep -q "addons/fc_weapons is a legacy name (deprecated; fc-weapons at "'
+check 'legacy: addons/arena_weapons linked' '[ -f "$P/game-fc/addons/arena_weapons/w.gd" ]'
+check 'legacy: deprecation names the dir'   'printf "%s" "$out" | grep -q "addons/arena_weapons is a legacy name (deprecated; fc-weapons at "'
 
 # 3. A game on the legacy name, a checkout on the new one: an error, not an alias.
-setup fc_weapons fc_weapons; P="$T/p3"
+setup fc_weapons arena_weapons; P="$T/p3"
 out="$(run "$P")"; rc=$?
 check 'split: sync fails'                   '[ $rc -ne 0 ]'
-check 'split: nothing aliased'              '[ ! -e "$P/game-fc/addons/fc_weapons" ] && [ ! -e "$P/game-fc/addons/fc_weapons" ]'
-check 'split: says which side is which'     'printf "%s" "$out" | grep -q "asks for addons/fc_weapons, but fc-weapons at .* holds addons/fc_weapons"'
+check 'split: nothing aliased'              '[ ! -e "$P/game-fc/addons/arena_weapons" ] && [ ! -e "$P/game-fc/addons/fc_weapons" ]'
+check 'split: says which side is which'     'printf "%s" "$out" | grep -q "asks for addons/arena_weapons, but fc-weapons at .* holds addons/fc_weapons"'
 
 # 4. The other way round.
-setup fc_weapons fc_weapons; P="$T/p4"
+setup arena_weapons fc_weapons; P="$T/p4"
 out="$(run "$P")"; rc=$?
 check 'split back: sync fails'              '[ $rc -ne 0 ]'
-check 'split back: says which side'         'printf "%s" "$out" | grep -q "asks for addons/fc_weapons, but fc-weapons at .* holds addons/fc_weapons"'
+check 'split back: says which side'         'printf "%s" "$out" | grep -q "asks for addons/fc_weapons, but fc-weapons at .* holds addons/arena_weapons"'
 
 echo "test_renamed_addon_dir_sh: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
