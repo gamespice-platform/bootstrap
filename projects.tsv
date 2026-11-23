@@ -32,8 +32,11 @@
 # URL here on the next sync (GitHub's redirect for a renamed repository is not
 # something to lean on: it ends the moment a repository takes the old name).
 #
+# The dot-* names in the third column are TEMPORARY read-only aliases for checkouts made before the
+# rename to gs-*; drop them once no box still has a dot-* directory.
+#
 # TWO OWNERS, and the split is a rule rather than a set of accidents: the official
-# addons are the organisation's (`gamespice-platform/*`, the dot- prefix dropped) and the games, and any addon
+# addons are the organisation's (`gamespice-platform/*`, the gs- prefix dropped) and the games, and any addon
 # that is the author's own (gs-radio), are theirs (`zees-games/`). That is why the URL is written out per line here instead of being
 # derived from the name -- the name says what a project IS, not who owns it, and a
 # derivation would have to encode the split in two places. setup.sh's repo_url()

@@ -1024,7 +1024,7 @@ fetch_natives() {
         if [ ! -f "$stamp" ] && native_built_here "$lib" "$plat"; then
             say "$proj" "${DIM}natives: keeps the $addon library built here ($plat)${OFF}"; continue
         fi
-        # The organisation names its repositories without the dot- prefix; a named base keeps the directory name.
+        # The organisation names its repositories without the gs- prefix; a named base keeps the directory name.
         if [ -n "${GS_NATIVES_BASE:-}" ]; then base="${GS_NATIVES_BASE:-}/$repo/releases/download/$tag"
         else base="https://github.com/gamespice-platform/${repo#gs-}/releases/download/$tag"; fi
         tmp="$(mktemp -d)"

@@ -1163,7 +1163,7 @@ function Fetch-Natives ($proj) {
         if (-not (Test-Path $stamp) -and (Test-NativeBuiltHere $libDir $plat)) {
             Say $proj "natives: keeps the $($n.Addon) library built here ($plat)" 'DarkGray'; continue
         }
-        # The organisation names its repositories without the dot- prefix; a named base keeps the directory name.
+        # The organisation names its repositories without the gs- prefix; a named base keeps the directory name.
         $repoName = if ($env:GS_NATIVES_BASE) { $n.Repo } else { $n.Repo -replace '^gs-', '' }
         $base = "$root/$repoName/releases/download/$($n.Tag)"
         try { $sums = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri "$base/SHA256SUMS.natives").Content }
