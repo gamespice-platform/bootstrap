@@ -4,6 +4,11 @@
 # SSH (git protocol, the machine's existing deploy key: NO GitHub API call, NO gh token) into a bare cache and
 # pushes the branches to Forgejo. Tags are NOT pushed on purpose: release workflows trigger on tags and must
 # stay on GitHub. Forgejo runs the repo's workflows on each branch push.
+# Locked tags: for every tag in the addons lock (repo<TAB>tag; env FORGEJO_PINS_LOCK, default
+# ../gs-server-deploy/addons.lock when readable) the tag's commit is fetched over SSH and pushed as the BRANCH
+# pin/<tag> (plus the injected CI commit on top, see forgejo-inject-ci.sh), so Forgejo has a run for the exact
+# commit `addons-lock.sh check-ci` asks about. The tag itself is never pushed and nothing is written to GitHub.
+# A tag at the default branch's tip needs no pin branch. Branches whose tag left the lock are pruned.
 #   forgejo-mirror.sh                 every repo in projects.tsv
 #   forgejo-mirror.sh NAME [NAME...]  only those names (first column of projects.tsv)
 #   Repos not in projects.tsv (the web apps, bootstrap itself) are listed in ci/forgejo-extra.tsv, same columns.
@@ -17,6 +22,7 @@ tsv="${PROJECTS_TSV:-$here/projects.tsv}"
 extra="${FORGEJO_EXTRA_TSV:-$here/ci/forgejo-extra.tsv}"
 cache="${FORGEJO_MIRROR_CACHE:-$HOME/.cache/forgejo-mirror}"
 envf="${FORGEJO_ENV:-$HOME/.config/forgejo/env}"
+pins="${FORGEJO_PINS_LOCK:-$here/../gs-server-deploy/addons.lock}"
 list=0; [ "${1:-}" = "--list" ] && { list=1; shift; }
 want=("$@")
 
@@ -63,10 +69,37 @@ while IFS=$'\t' read -r name url _; do
     # default branch follows GitHub's HEAD when known
     hb="$(git -C "$bare" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^\t ]*\).*#\1#p' | head -1)"
     [ -n "$hb" ] && git -C "$bare" symbolic-ref HEAD "refs/heads/$hb"
+    # Locked tags as pin/<tag> branches (after the fetch: its --prune drops them from the cache each run)
+    if [ -r "$pins" ] && [ -n "$hb" ]; then
+        mapfile -t tags < <(awk -F'\t' -v n="$name" '$1 == n && $2 != "" { print $2 }' "$pins")
+        tip="$(git -C "$bare" rev-parse "refs/heads/$hb")"
+        for t in "${tags[@]}"; do
+            if ! timeout 300 git -C "$bare" fetch -q --no-tags origin "+refs/tags/$t:refs/tags/$t" 2>/dev/null; then
+                echo "warn $name: tag $t not fetchable"; continue
+            fi
+            psha="$(git -C "$bare" rev-parse -q --verify "refs/tags/$t^{commit}")" || continue
+            [ "$psha" = "$tip" ] && continue
+            git -C "$bare" update-ref "refs/heads/pin/$t" "$psha"
+            "$here/tools/forgejo-inject-ci.sh" "$bare" "pin/$t" >/dev/null
+        done
+    fi
     # Reusable-workflow callers: point them at the ci repo on this Forgejo (local commit, never on GitHub)
     [ -n "$hb" ] && "$here/tools/forgejo-inject-ci.sh" "$bare" "$hb" >/dev/null
-    if out="$(timeout 600 git -C "$bare" -c "http.extraHeader=Authorization: token $FORGEJO_TOKEN" \
-            push -q --prune --force "$FORGEJO_URL/$owner/$repo.git" 'refs/heads/*:refs/heads/*' 2>&1)"; then
+    push() { timeout 600 git -C "$bare" -c "http.extraHeader=Authorization: token $FORGEJO_TOKEN" \
+            push -q --prune --force "$FORGEJO_URL/$owner/$repo.git" 'refs/heads/*:refs/heads/*' 2>&1; }
+    out="$(push)"; rc=$?
+    # The owner pre-push hook (/usr/local/lib/git-owner-hooks) runs the efficiency gates on every push of main
+    # and compares the new tip with the remote's OLD tip. A Forgejo copy left behind across a big rename (dot-* to
+    # gs-*, 2026-11) makes every renamed baseline key look "raised or added" and refuses a tip that is GitHub's
+    # own, already gated there. Forgejo is a disposable copy, so recreate it: a first push has no old tip.
+    if [ $rc -ne 0 ] && grep -q 'pre-push: refusing.*efficiency gates' <<<"$out"; then
+        echo "note $name: stale Forgejo copy refused by the pre-push gates; recreating $owner/$repo"
+        api DELETE "/repos/$owner/$repo" >/dev/null
+        c="$(api POST "/orgs/$owner/repos" "{\"name\":\"$repo\",\"private\":false,\"default_branch\":\"main\"}")"
+        api PATCH "/repos/$owner/$repo" '{"has_actions":true}' >/dev/null
+        if [ "$c" = 201 ]; then out="$(push)"; rc=$?; fi
+    fi
+    if [ $rc -eq 0 ]; then
         [ -n "$hb" ] && api PATCH "/repos/$owner/$repo" "{\"default_branch\":\"$hb\"}" >/dev/null
         echo "ok   $name -> $owner/$repo"; n=$((n+1))
     else

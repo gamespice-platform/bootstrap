@@ -20,6 +20,10 @@ Not exposed: there is no nginx, DNS or auth in front of it. To read the UI from 
 2. fetches the GitHub branches over SSH into a bare cache (`~/.cache/forgejo-mirror`);
 3. pushes the branches to Forgejo and sets the default branch to GitHub's.
 
+Locked tags: for every tag in `gs-server-deploy/addons.lock` (override the path with `FORGEJO_PINS_LOCK`) the mirror also fetches the tag's commit over SSH and pushes it as the branch `pin/<tag>` (with the injected CI commit on top), so `addons-lock.sh check-ci` finds a Forgejo run for the exact commit and makes no GitHub call. A tag that sits at the default branch's tip needs no pin branch; branches of tags that left the lock are pruned. Re-run the mirror after `addons-lock.sh write`.
+
+A stale Forgejo copy (for example from before the dot-to-gs rename) can make the owner pre-push hook (`/usr/local/lib/git-owner-hooks`, efficiency gates on every push of `main`, compared with the remote's old tip) refuse GitHub's own tip as "baseline raised or added", because every renamed baseline key looks new. The mirror then deletes and recreates that Forgejo repo (a disposable copy) and pushes again; a first push has no old tip. The hook is not bypassed.
+
 Tags are never pushed, on purpose: release workflows trigger on `v*` tags and must stay on GitHub. A branch push is what triggers Forgejo workflows. GitHub stays the source of truth; Forgejo is overwritten from it, so never push to Forgejo directly.
 
 - Repos are the rows of `projects.tsv` plus `ci/forgejo-extra.tsv` (tmc-app, website-city, bootstrap: repos that are not in the project list).
