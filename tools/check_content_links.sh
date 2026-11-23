@@ -82,7 +82,7 @@ for g in $games; do
         linked_repos="$linked_repos $r"
     done < <(awk '/^# bootstrap-optional/{o=1;next} o&&/^\/addons\//{sub("^/addons/","");print} {o=0}' "$gi")
     # Content rule: a zz-* pack (weapons, monsters) is content, so its /addons line must carry
-    # "# bootstrap-optional". zee/zed weapons are not: game scripts name their classes.
+    # "# bootstrap-optional". zee weapons are not: game scripts name their classes.
     while read -r a; do
         [ -n "$a" ] || continue
         awk -v a="/addons/$a" '/^# bootstrap-optional/{o=1;next} $0==a{if(!o)f=1} {o=0} END{exit !f}' "$gi" \
@@ -98,7 +98,7 @@ done
 # Every maps repository and weapon/monster pack must be linked by some game.
 for r in $(grep -v '^[[:space:]]*#' "$tsv" | cut -f1 | grep -E -- '-maps$|^zz-|^z[a-z]+-gs-weapons$'); do
     case " $linked_repos " in *" $r "*) ;; *)
-        # zee/zed weapons are addons (/addons/zee_weapons): linked when any plan names them.
+        # zee weapons are addons (/addons/zee_weapons): linked when any plan names them.
         grep -q "addon ${r/-gs-/_}$" <<< "$default_plan" || bad "$r is never linked by any game's .gitignore" ;;
     esac
 done
