@@ -123,3 +123,5 @@ function Invoke-GSDownload([string]$Uri, [string]$OutFile, [string]$Name = '', $
     }
     if ($own) { Write-GSProgress $Progress -Final }
 }
+
+. (Join-Path $PSScriptRoot 'gs_cdn.ps1')

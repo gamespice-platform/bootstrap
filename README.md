@@ -142,6 +142,17 @@ The CDN is the first of these that is set:
 5. The lock file's own `origin` and `mirrors`.
 6. `https://content.gamespice.net`.
 
+### The dev CDN (`https://x-tmc-storez`)
+
+The dev CDN is the dev storez node behind an nginx vhost on the dev VM (10.50.0.111, `/etc/nginx/sites-enabled/x-tmc-storez.conf`); packs sit at `/content/<owner>/<id>/latest.json` like on prod. Publish to it through the dev site (`GS_SITE=https://tmcdev.net tools/publish.sh ...`); each site signs with its own key, so a lock file pinned to prod needs `manifest_sha256_by_origin` for this base. Point every repo at it with `GS_CDN_URL=https://x-tmc-storez` in `.env`. Every `bootstrap` run prints the CDN on its top lines (`cdn:  https://x-tmc-storez  (DEV, from .env)`, in colour) so a dev run cannot pass for prod.
+
+The certificate comes from the TMC Local Development CA, published at `https://x-tmc-storez/tmc-local-ca.crt` (and plain `http://x-tmc-storez/tmc-local-ca.crt`).
+
+| Where | Trust the CA |
+| --- | --- |
+| Linux / macOS (`fetch_lock.sh`) | `GS_CDN_CA=/path/tmc-local-ca.crt` in `.env` or the environment (used for the fetch only; on the dev VM `/opt/tmc-local-ca.crt`). |
+| Windows (`fetch_lock.ps1`, `bootstrap.ps1`) | PowerShell uses the Windows certificate store, not a browser's. `-TrustDevCa` (or `$env:GS_TRUST_DEV_CA=1`) imports the CA into `Cert:\CurrentUser\Root` (no admin, one Windows confirm); an interactive run with a dev CDN that fails the handshake asks first. By hand: `Invoke-WebRequest http://x-tmc-storez/tmc-local-ca.crt -OutFile $env:TEMP\ca.crt; Import-Certificate -FilePath $env:TEMP\ca.crt -CertStoreLocation Cert:\CurrentUser\Root` |
+
 Download lists in `cfg/content/addons.yml` and `games.yml` (and `cfg/server/content/`) are respected. Packs are only mirrored when `--packs DIR` is given; otherwise `GSCloudClient` mounts them at run time. The raw art stores of `zombie-zone-maps` are fetched once and kept; set `GS_STORES_FROM=none` to skip them, or to a folder or `.tar` URL to use your own. On Windows the fetch scripts need PowerShell 7 (`pwsh`) or the Windows PowerShell 5.1 that ships with Windows 10 and later.
 
 ## Publishing from a fresh clone

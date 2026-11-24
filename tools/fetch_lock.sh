@@ -17,6 +17,7 @@
 #   manifest_sha256 is the lock origin's (prod by default and never changed for dev); an entry may add
 #   "manifest_sha256_by_origin": {"https://dev.dotgames.org/content": "<sha>"}, used when that base serves the manifest. A key
 #   naming a renamed host matches its new name too (GS_ORIGIN_ALIASES, default https://dotgames.org=https://content.gamespice.net).
+# GS_CDN_CA=<file> trusts one extra CA (the dev CDN's local CA; curl --cacert equivalent). Windows: fetch_lock.ps1 -TrustDevCa.
 # A token file path in GS_PACKS_TOKEN_FILE (never the token itself) is sent as a bearer.
 set -euo pipefail
 LOCK="${1:?usage: fetch_lock.sh <content.lock.json> [--root DIR] [--from BASE|--cdn URL] [--cfg DIR] [--skip IDs] [--only IDs] [--packs DIR] [--list]}"; shift
@@ -40,7 +41,7 @@ done
 [ "${GS_PACKS_FROM:-}" = none ] || [ "$FROM" = none ] && { echo "fetch_lock: GS_PACKS_FROM=none, nothing fetched"; exit 0; }
 command -v python3 >/dev/null || { echo "fetch_lock: python3 is needed" >&2; exit 2; }
 exec python3 -I - "$LOCK" "$ROOT" "$FROM" "$SKIP" "$ONLY" "$PACKS" "$HERE" "$CFG" "$CDN" "$LIST" <<'PY'
-import base64, fnmatch, hashlib, json, math, os, sys, time, urllib.request, urllib.error, zlib
+import base64, fnmatch, hashlib, json, math, os, ssl, sys, time, urllib.request, urllib.error, zlib
 lock, root, base, skip, only, packs, here, cfg, cdn, listing = sys.argv[1:11]
 skip = {s for s in skip.split(",") if s}; only = {s for s in only.split(",") if s}
 doc = json.load(open(lock))
@@ -128,12 +129,20 @@ tok = ""
 tf = os.environ.get("GS_PACKS_TOKEN_FILE", "")
 if tf: tok = open(tf).read().strip()
 
+# GS_CDN_CA (env, else gs-bootstrap/.env): a CA file the dev CDN's certificate is signed by (the TMC Local Development CA,
+# https://x-tmc-storez/tmc-local-ca.crt), added to the system roots for this fetch only. Unset: the system roots, as before.
+_ca = os.environ.get("GS_CDN_CA") or env.get("GS_CDN_CA", "")
+TLS = None
+if _ca:
+    if not os.path.isfile(_ca): sys.exit("fetch_lock: GS_CDN_CA %s is not a file" % _ca)
+    TLS = ssl.create_default_context(); TLS.load_verify_locations(cafile=_ca)
+
 def get(url, start=0):
     # Cloudflare refuses the default Python-urllib agent (error 1010) on dev.dotgames.org.
     h = {"User-Agent": "gs-bootstrap-fetch-lock/1"}
     if tok: h["Authorization"] = "Bearer " + tok
     if start: h["Range"] = "bytes=%d-" % start
-    return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60)
+    return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60, context=TLS)
 
 # The pack's progress line, as tools/gs_download.ps1 prints it: name, file i/n, MB done / total, MB/s, ETA, at most
 # every GS_PROGRESS_SECONDS (2) s, and a done line if any was shown.

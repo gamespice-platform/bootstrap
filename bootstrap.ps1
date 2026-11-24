@@ -113,6 +113,7 @@ param(
     [switch]$Min,
     [switch]$ZeesGamesMin,
     [switch]$Plan,
+    [switch]$TrustDevCa,
     [string[]]$Games = @(),
     [string[]]$Addons = @(),
     [string]$Play,
@@ -1485,6 +1486,7 @@ function Get-Games { Get-Projects | Where-Object { ($_.Name -like 'game-*' -or $
 function List-Games {
     $bin = Find-Godot
     Write-Host "projects: $projectsDir"
+    Write-GSCdnHeader
     if ($bin) { Write-Host "godot:    $bin" } else { Write-Host 'godot:    not found' -ForegroundColor Red }
     Write-Host ''
     foreach ($g in Get-Games) {
@@ -2054,7 +2056,9 @@ if ($PlayExport)  { Play-Export $PlayExport; exit 0 }
 elseif ($List)    { List-Games; exit 0 }
 elseif ($Check)   { Check-List }
 elseif ($Status)  {
-    Write-Host "projects: $projectsDir`n"
+    Write-Host "projects: $projectsDir"
+    Write-GSCdnHeader
+    Write-Host ''
     foreach ($p in Get-Selected) { Status-Repo $p }
 }
 elseif ($Links)   {
@@ -2073,7 +2077,13 @@ elseif ($ContentKeys) {
 else {
     New-Item -ItemType Directory -Force -Path $projectsDir | Out-Null
     Write-Host "projects: $projectsDir"
-    Write-Host "base:     $GitBase`n"
+    Write-Host "base:     $GitBase"
+    Write-GSCdnHeader
+    $gsCdn = Get-GSCdnInfo
+    if ($TrustDevCa) { $env:GS_TRUST_DEV_CA = '1' }
+    if ($gsCdn.Dev) { Initialize-GSCdnTrust $gsCdn.Url -Trust:$TrustDevCa }
+    Write-Host ''
+
     # Repositories first, all of them, then links -- a link can point into a
     # project this same run is about to clone.
     if ($script:selection.Count -gt 0) {

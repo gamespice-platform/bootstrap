@@ -202,6 +202,24 @@ https_for() {
 RED=$'\033[31m'; GRN=$'\033[32m'; YLW=$'\033[33m'; CYN=$'\033[36m'; DIM=$'\033[2m'; OFF=$'\033[0m'
 fail=0
 
+# The content CDN this run's fetches use, and where that came from (--cdn is per fetch_lock call; here: $GS_PACKS_FROM, $GS_CDN_URL,
+# gs-bootstrap/.env, else prod). A lock's own `origin` applies per repository when none of these is set. DEV is loud.
+cdn_line() {
+    local url="" src="" v
+    if [ -n "${GS_PACKS_FROM:-}" ]; then url="$GS_PACKS_FROM"; src='$GS_PACKS_FROM'
+    elif [ -n "${GS_CDN_URL:-}" ]; then url="$GS_CDN_URL"; src='$GS_CDN_URL'
+    elif [ -f "$SELF_DIR/.env" ]; then
+        v="$(sed -n 's/^[[:space:]]*GS_CDN_URL[[:space:]]*=[[:space:]]*//p' "$SELF_DIR/.env" | tail -1 | tr -d "\"'\r")"
+        [ -n "$v" ] && { url="$v"; src=.env; }
+    fi
+    if [ -z "$url" ]; then printf 'cdn:      %s  (prod, default)\n' "https://content.gamespice.net"; return; fi
+    url="${url%/}"; url="${url%/content}"
+    case "$url" in
+        https://content.gamespice.net|https://dotgames.org) printf 'cdn:      %s  (prod, %s)\n' "$url" "$src" ;;
+        *) printf '%scdn:      %s  (DEV, from %s)%s\n' "$YLW" "$url" "$src" "$OFF" ;;
+    esac
+}
+
 say()  { printf '%-22s %s\n' "$1" "$2"; }
 ok()   { printf '%-22s %s\n' "$1" "${GRN}$2${OFF}"; }
 warn() { printf '%-22s %s\n' "$1" "${YLW}$2${OFF}"; }
@@ -1279,6 +1297,7 @@ list_games() {
     local g bin
     bin="$(find_godot || true)"
     echo "projects: $PROJECTS_DIR"
+    cdn_line
     echo "godot:    ${bin:-${RED}not found on PATH${OFF}}"
     echo
     while read -r g; do
@@ -1867,7 +1886,7 @@ run_import() {
 
 case "$mode" in
     --status)
-        echo "projects: $PROJECTS_DIR"; echo
+        echo "projects: $PROJECTS_DIR"; cdn_line; echo
         while read -r p; do [ -n "$p" ] && status_repo "$p"; done <<< "$(selected)"
         ;;
     --check)
@@ -1909,7 +1928,7 @@ case "$mode" in
         ;;
     sync|"")
         echo "projects: $PROJECTS_DIR"
-        echo "base:     $GIT_BASE"; echo
+        echo "base:     $GIT_BASE"; cdn_line; echo
         # Repositories first, all of them, then links -- a link can point into a
         # project that this same run is about to clone.
         [ ${#ONLY[@]} -gt 0 ] && echo "only:     ${ONLY[*]}$([ "$NO_DEPS" = "1" ] && echo " (no deps)")" && echo

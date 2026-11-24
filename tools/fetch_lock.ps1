@@ -1,10 +1,12 @@
 # THE one fetcher on Windows: fetch exactly what a repo's content.lock.json names, hash-checked, once (present files skipped).
-#   .\tools\fetch_lock.ps1 <content.lock.json> [-Root DIR] [-From BASE] [-Cdn URL] [-Cfg DIR] [-Except a,b] [-Only a,b] [-Packs DIR] [-List]
+#   .\tools\fetch_lock.ps1 <content.lock.json> [-Root DIR] [-From BASE] [-Cdn URL] [-Cfg DIR] [-Except a,b] [-Only a,b] [-Packs DIR] [-List] [-TrustDevCa]
+# -TrustDevCa ($env:GS_TRUST_DEV_CA=1): when the CDN is the dev one on the TMC local CA (https://x-tmc-storez) and Windows does not trust it, import
+# <cdn>/tmc-local-ca.crt into Cert:\CurrentUser\Root (tools\gs_cdn.ps1); without it an interactive run asks first.
 # Same behaviour as fetch_lock.sh, which documents the lock, the item names (id, name half, into, kind, repo; globs) and the cfg/content
 # rules. Where from, first set wins: -From, $env:GS_PACKS_FROM ('none' fetches nothing), -Cdn / $env:GS_CDN_URL, GS_CDN_URL in
 # gs-bootstrap\.env, the lock's origin and mirrors, https://content.gamespice.net. (-Skip is the older name of -Except.)
 param([Parameter(Mandatory)][string]$Lock, [string]$Root, [string]$From, [string]$Cdn, [string]$Cfg, [string]$Packs,
-      [Alias('Skip')][string[]]$Except = @(), [string[]]$Only = @(), [switch]$List)
+      [Alias('Skip')][string[]]$Except = @(), [string[]]$Only = @(), [switch]$List, [switch]$TrustDevCa)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'  # never PowerShell's progress bar (it slows 5.1 to a crawl); gs_download.ps1 prints our own
 . (Join-Path $PSScriptRoot 'gs_download.ps1')
@@ -20,6 +22,7 @@ if (Test-Path $envFile) { foreach ($l in Get-Content $envFile) { $l = $l.Trim();
 if (-not $From -and -not $Cdn) { $Cdn = $dotenv['GS_CDN_URL'] }
 if (-not $From -and -not $Cdn) { $From = $dotenv['GS_PACKS_FROM'] }
 if ($Cdn -and -not $From) { $From = $Cdn.TrimEnd('/'); if ($From -match '^[a-z]+://' -and -not $From.EndsWith('/content')) { $From += '/content' } }
+if ($From -match '^https://') { Initialize-GSCdnTrust $From -Trust:$TrustDevCa }
 if ($From -eq 'none') { Write-Host 'fetch_lock: GS_PACKS_FROM=none, nothing fetched'; exit 0 }
 $doc = Get-Content -Raw $Lock | ConvertFrom-Json
 if ($doc.format -ne 1) { throw 'fetch_lock: unsupported lock format' }
