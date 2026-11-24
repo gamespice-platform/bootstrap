@@ -174,6 +174,7 @@ def fetch(rel, dest, sha, retries=4, pg=None):
         try:
             have = os.path.getsize(part) if os.path.exists(part) else 0
             want = sha(bases[attempt % len(bases)]) if callable(sha) else sha
+            if want is None: want = ""   # an unpinned dev-latest manifest: its own hash is not known beforehand
             r = get(url, have)
             # The site stores some objects gzip-encoded and the CDN sends them so whatever was asked;
             # the sha256 names the decoded bytes, and a range of a gzip stream cannot be resumed.
@@ -192,7 +193,7 @@ def fetch(rel, dest, sha, retries=4, pg=None):
             h = hashlib.sha256()
             with open(part, "rb") as f:
                 for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
-            if h.hexdigest() == want:
+            if want == "" or h.hexdigest() == want:
                 os.replace(part, dest); return
             os.remove(part)
             raise IOError("hash mismatch for " + url)
@@ -221,10 +222,24 @@ def canon(u):
             return new.rstrip("/") + u[len(old):]
     return u
 
+# DEV LATEST: a non-prod CDN (GS_CDN_URL / --cdn / --from URL) is asked for each pack's latest.json; a newest version named
+# "...-dev.N" replaces the lock's pin FOR THIS FETCH ONLY (the lock file is never written). Its manifest hash is not pinned
+# (the dev site signs with its own key; the client still verifies the signature when it mounts). GS_CDN_PIN=1 keeps the pins.
+PROD_HOSTS = ("content.gamespice.net", "dotgames.org")
+DEVLATEST = base.startswith("http") and not any(h in base for h in PROD_HOSTS) and os.environ.get("GS_CDN_PIN", "") != "1"
+def dev_latest(pid):
+    try:
+        v = json.load(get(bases[0] + "/" + pid + "/latest.json")).get("version", "")
+        return v if "-dev." in v else ""
+    except Exception: return ""
+
 bad = 0
 for p in doc["packs"]:
     pid, ver, into, kind = p["id"], p["version"], p.get("into", ""), p.get("kind", "pack")
     mh = pinned(p); stamp_sha = mh(bases[0])
+    dv = dev_latest(pid) if DEVLATEST and kind == "pack" else ""
+    if dv and dv != ver:
+        print("dev-latest", pid, ver, "->", dv, "(unpinned, lock untouched)"); ver = dv; mh = lambda b: None; stamp_sha = "dev-latest"
     if kind == "pack" and packs:
         # Mirror the origin's layout (manifest.json + objects/) so a server serves it as published.
         w = wanted(p)

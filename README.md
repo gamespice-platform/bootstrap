@@ -146,6 +146,8 @@ The CDN is the first of these that is set:
 
 The dev CDN is the dev storez node behind an nginx vhost on the dev VM (10.50.0.111, `/etc/nginx/sites-enabled/x-tmc-storez.conf`); packs sit at `/content/<owner>/<id>/latest.json` like on prod. Publish to it through the dev site (`GS_SITE=https://tmcdev.net tools/publish.sh ...`); each site signs with its own key, so a lock file pinned to prod needs `manifest_sha256_by_origin` for this base. Point every repo at it with `GS_CDN_URL=https://x-tmc-storez` in `.env`. Every `bootstrap` run prints the CDN on its top lines (`cdn:  https://x-tmc-storez  (DEV, from .env)`, in colour) so a dev run cannot pass for prod.
 
+Dev latest: against a non-prod CDN `fetch_lock.sh` reads each pack's `latest.json`; when it names a `-dev.N` version, that version is fetched instead of the lock's pin (manifest hash not pinned; the lock file is never written; `GS_CDN_PIN=1` keeps the pins). Windows fetchers (`fetch_lock.ps1`) do not do this yet.
+
 The certificate comes from the TMC Local Development CA, published at `https://x-tmc-storez/tmc-local-ca.crt` (and plain `http://x-tmc-storez/tmc-local-ca.crt`).
 
 | Where | Trust the CA |
