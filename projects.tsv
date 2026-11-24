@@ -121,11 +121,11 @@ gs-workbench	git@github.com:gamespice-platform/workbench.git	dot-workbench
 gs-weather	git@github.com:gamespice-platform/weather.git	dot-weather
 gs-radio	git@github.com:zees-games/gs-radio.git	dot-radio
 gs-trail	git@github.com:zees-games/gs-trail.git	dot-trail
-game-fatal-contact	git@github.com:zees-games/game-fatal-contact.git	game-arena,arena,final-contact,fc
+game-fatal-contact	git@github.com:zees-games/game-fatal-contact.git	arena,final-contact,fc
 fc-surf-dm-maps	git@github.com:zees-games/fc-surf-dm-maps.git	arena-surf-dm-maps
 fc-dm-maps	git@github.com:zees-games/fc-dm-maps.git	arena-dm-maps
 # legacy id: the third column below holds the names these repositories had before the rename.
-game-airdrift	git@github.com:zees-games/game-airdrift.git	game-g2gfast,g2gfast
+game-airdrift	git@github.com:zees-games/game-airdrift.git	g2gfast
 airdrift-maps	git@github.com:zees-games/airdrift-maps.git	g2gfast-maps
 game-hide-n-seek	git@github.com:zees-games/game-hide-n-seek.git
 game-hungario	git@github.com:zees-games/game-hungario.git

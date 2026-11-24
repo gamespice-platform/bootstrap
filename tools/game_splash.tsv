@@ -1,6 +1,6 @@
 # game dir	display name (config/name)	icon cover (only read by --make-icons)	background
-game-fatal-contact	Fatal Contact	/home/gamedev/banners/covers/game-arena.png	#0d0f14
-game-airdrift	Zee's Airdrift	/home/gamedev/banners/covers/game-g2gfast.png	#0d0f14
+game-fatal-contact	Fatal Contact	/home/gamedev/banners/covers/game-fatal-contact.png	#0d0f14
+game-airdrift	Zee's Airdrift	/home/gamedev/banners/covers/game-airdrift.png	#0d0f14
 game-playlot	Zee's Playlot	/home/gamedev/banners/covers/game-playground.png	#0d0f14
 game-hungario	Hungario	/home/gamedev/banners/covers/game-hungario.png	#0d0f14
 game-hide-n-seek	Hide and Seek	/home/gamedev/banners/covers/game-hide-n-seek.png	#0d0f14
