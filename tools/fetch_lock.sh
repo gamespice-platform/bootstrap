@@ -211,8 +211,9 @@ def pinned(p):
     return lambda b: by.get(canon(b), p["manifest_sha256"])
 
 # Renamed CDN hosts, old=new (the game CDN dotgames.org became content.gamespice.net and stays served under both).
-# GS_ORIGIN_ALIASES replaces the list (space separated old=new); empty turns it off.
-ALIASES = [a.split("=", 1) for a in os.environ.get("GS_ORIGIN_ALIASES", "https://dotgames.org=https://content.gamespice.net").split() if "=" in a]
+# GS_ORIGIN_ALIASES (environment, else gs-bootstrap/.env) replaces the list (space separated old=new); empty turns it off.
+# The dev VM's .env maps the dev site's key onto its CDN: GS_ORIGIN_ALIASES="https://dotgames.org=https://content.gamespice.net https://dev.dotgames.org=https://x-tmc-storez".
+ALIASES = [a.split("=", 1) for a in os.environ.get("GS_ORIGIN_ALIASES", env.get("GS_ORIGIN_ALIASES", "https://dotgames.org=https://content.gamespice.net")).split() if "=" in a]
 
 def canon(u):
     u = u.rstrip("/")
