@@ -662,6 +662,81 @@ prune_stale() {
 	done
 	return 0
 }
+# import_heal DIR (2026-11-26): DIR is a .godot/imported that no Godot is writing. Godot 4.7 ignores write errors: on a
+# full disk (PH at 100%, 2026-11-26 01:59) it renames an empty or cut-short import output into place and its .md5 records
+# those bytes as correct, so the output is never rebuilt, every run on that workspace logs "Unrecognized binary resource
+# file: people_matt.glb", and SEED_WS copied it on to other workspaces. Removes each output that is empty, a binary
+# resource without its RSRC/RSCC end mark (or, compressed, shorter than its block table says) or a PNG/WebP .ctex shorter
+# than its mip levels say, together with its .md5 so the next --import rebuilds it, and the <file>-XXXXXX temporaries a
+# killed import leaves. Prints how many outputs it removed (0 without python3).
+import_heal() {
+	[ -d "$1" ] && command -v python3 >/dev/null || { echo 0; return 0; }
+	python3 -I - "$1" <<'PY'
+import os, re, struct, sys
+d = sys.argv[1]
+def broken(p):
+	n = os.path.getsize(p)
+	if n == 0:
+		return True
+	with open(p, "rb") as f:
+		h = f.read(4)
+		if h in (b"RSRC", b"RSCC"):
+			if n < 8:
+				return True
+			f.seek(-4, 2)
+			if f.read(4) != h:
+				return True
+			if h == b"RSCC":
+				f.seek(4)
+				hd = f.read(12)
+				if len(hd) < 12:
+					return True
+				_, bs, total = struct.unpack("<III", hd)
+				if bs == 0:
+					return True
+				bc = total // bs + 1
+				sz = f.read(4 * bc)
+				if len(sz) != 4 * bc:
+					return True
+				return 16 + 4 * bc + sum(struct.unpack("<%dI" % bc, sz)) + 4 != n
+		elif h == b"GST2":
+			hd = f.read(48)
+			if len(hd) < 48:
+				return True
+			fmt, mips = struct.unpack_from("<I", hd, 32)[0], struct.unpack_from("<I", hd, 40)[0]
+			if fmt in (1, 2):  # PNG / WebP: one length-prefixed blob per mip level
+				pos = 52
+				for _ in range(mips + 1):
+					f.seek(pos)
+					b = f.read(4)
+					if len(b) < 4:
+						return True
+					pos += 4 + struct.unpack("<I", b)[0]
+				return pos != n
+	return False
+tmp = re.compile(r"\.[A-Za-z0-9_]+-[A-Za-z0-9]{6}$")
+base = re.compile(r"^(.*-[0-9a-f]{32})\.")
+gone = 0
+for e in os.scandir(d):
+	if not e.is_file(follow_symlinks=False):
+		continue
+	if tmp.search(e.name):
+		os.unlink(e.path); continue
+	if e.name.endswith(".md5"):
+		continue
+	try:
+		bad = broken(e.path)
+	except OSError:
+		bad = True
+	if bad:
+		os.unlink(e.path); gone += 1
+		m = base.match(e.name)
+		if m:
+			try: os.unlink(os.path.join(d, m.group(1) + ".md5"))
+			except FileNotFoundError: pass
+print(gone)
+PY
+}
 EOF
 
 # Peels `timeout [opts] DUR` and `env K=V...` off the front of a command, the way callers
@@ -1104,6 +1179,8 @@ if [ -f "$ccache" ] && { grep -q 'class": &"Dot' "$ccache" || [ -n "$(find -L ad
 	echo "gpu.sh: stale class cache in $project, re-importing from scratch" >&2
 	rm -f "$ccache" .godot/uid_cache.bin
 fi
+# Outputs a full disk cut short (import_heal) would load as "Unrecognized binary resource file" forever; drop them so this import rebuilds them.
+n=$(import_heal .godot/imported); [ "${n:-0}" = 0 ] || echo "gpu.sh: $n cut-short import outputs in $wsid on $(hostname), re-importing them" >&2
 in_slice nice -n 5 timeout 1800 "$GODOT" --headless --path . --import >"$ilog" 2>&1 </dev/null 6>&- 7>&- 9>&- {f}>&-
 # A stale class cache (a script gained a class_name or a member since the last run here) reads as
 # "Could not resolve external class member"; one import over a cleared cache fixes it, so retry once.
@@ -1116,6 +1193,13 @@ if grep -qE 'SCRIPT ERROR|Parse error|Could not resolve' "$ilog"; then
 	echo "gpu.sh: import of $project failed on the box:"
 	grep -E -A2 'SCRIPT ERROR|Parse error|Could not resolve class' "$ilog" | head -15
 	echo "__GPU_SUITE_RC=1"; exit 0
+fi
+# The disk filled (or the import was killed) while it wrote: the suite would load the cut-short files. They are removed
+# now, so the next import here rebuilds them; this job goes back to the queue rather than run on a broken import.
+n=$(import_heal .godot/imported)
+if [ "${n:-0}" != 0 ]; then
+	echo "gpu.sh: BUSY the import on $(hostname) wrote $n cut-short files ($(df -BG --output=avail . 2>/dev/null | tail -1 | tr -d ' ') free); removed, job given back" >&2
+	exit 75
 fi
 fi
 [ "$kind" = tool ] && export PATH=$HOME/gpu/bin:$PATH
@@ -1220,6 +1304,8 @@ tmp=ws/$wsid/.godot-seed.$$
 rm -rf "$tmp"
 if cp -a --reflink=auto "ws/$src/${src%%~*}/.godot" "$tmp" 2>/dev/null; then
 	rm -rf "$tmp/test-logs" "$tmp/global_script_class_cache.cfg" "$tmp/uid_cache.bin"
+	# Never pass on an output a full disk cut short in the source (import_heal, from GUARD_FN).
+	n=$(import_heal "$tmp/imported"); [ "${n:-0}" = 0 ] || echo "gpu.sh: dropped $n cut-short import outputs from $src's .godot before seeding $wsid" >&2
 	mv -T "$tmp" "$dst/.godot" 2>/dev/null && echo "gpu.sh: seeded $wsid's .godot on this box from $src" >&2
 fi
 rm -rf "$tmp"
@@ -1387,7 +1473,7 @@ offer_on() {
 	local repo=
 	repo=$(git -C "$PROJ_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && repo=$(basename "$(dirname "$repo")") || repo=
 	[[ $repo =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]] || repo=
-	timeout -k 5 300 "${SSH[@]}" "bash -c $(printf '%q' "$SEED_WS") _ $(printf '%q ' "$project" "$repo" "$wsid")" </dev/null ||
+	timeout -k 5 300 "${SSH[@]}" "bash -c $(printf '%q' "$GUARD_FN"$'\n'"$SEED_WS") _$(printf '%q ' "$project" "$repo" "$wsid")" </dev/null ||
 		back_to_queue "cannot make the workspace on $BOX"
 	local ex=() lk lt
 	# A tool job is copied with links resolved, so a link into ANOTHER worktree would ship that worktree's files
@@ -1585,6 +1671,7 @@ ccache=.godot/global_script_class_cache.cfg
 if [ -f "$ccache" ] && { grep -q 'class": &"Dot' "$ccache" || [ -n "$(find -L addons -name '*.gd' -newer "$ccache" -print -quit 2>/dev/null)" ]; }; then
 	rm -f "$ccache" .godot/uid_cache.bin
 fi
+import_heal .godot/imported >/dev/null
 nice -n 5 timeout 900 "$HOME/gpu/bin/godot" --headless --path . --import >/dev/null 2>&1 </dev/null 8>&- 9>&- {f}>&-
 touch ../"$project".stamp
 sleep 1
