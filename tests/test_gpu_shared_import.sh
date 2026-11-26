@@ -50,7 +50,7 @@ out=$(box 1 remote_shared import.q echo ran)
 release
 
 # 4. the call sites
-grep -q 'remote_shared "import.\$project" bash -c .*--import' "$src" && ok "run's headless import uses remote_shared" || bad "run's import is not shared"
+grep -q 'remote_shared "import.\$project" bash -c "\$RUN_IMPORT"' "$src" && grep -q '^imp() { timeout 900 "\$g" --headless --path . --import' "$src" && ok "run's headless import uses remote_shared" || bad "run's import is not shared"
 grep -q 'remote_shared rel bash .*gpu-release-export.sh' "$src" && ok "the release export uses remote_shared" || bad "release export is not shared"
 grep -n '^[^#]*remote_locked.*\(--import\|gpu-release-export\)' "$src" && bad "an import/export still takes the gate" || ok "no import/export through remote_locked"
 exit $fail

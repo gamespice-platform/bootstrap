@@ -482,6 +482,51 @@ remote_shared() {
 	"${SSH[@]}" "flock $w-o ~/gpu/prep.$key.lock flock $w-s -o ~/gpu/.lock bash -lc $(printf '%q' "$cmd")"
 }
 
+# Parse errors in `run` (2026-11-26): headless Godot with a script it cannot parse idles instead of exiting, so a bench over a
+# broken tree (a duplicated add_cvar line in FC) looked like a silent hang. RUN_IMPORT is run's import on the box (args: project
+# dir, godot, log, regex). It keeps the log (~/gpu/run-import.<project>.log), retries once over a cleared class cache as the
+# suite import does (a stale cache reads as "Could not resolve"), and when the errors stay it prints them with their
+# res://file:line, drops the class cache so the next run imports again, and exits 3. An import it skips (cache newer than every
+# source) keeps the last log, which was clean, since a failed one leaves no cache. IMPORT_ERR_RE is the suite import's check.
+IMPORT_ERR_RE='SCRIPT ERROR|Parse [Ee]rror|Failed to load script|Could not resolve'
+RUN_ERR_RE='Parse Error|Compile Error|Failed to load script'
+PARSE_REPORT='grep -E -A1 "$re" "$log" | grep -E "$re|res://[^ )]*:[0-9]+" | head -40 >&2'
+RUN_IMPORT='cd "$1" || exit 0
+g=$2 log=$3 re=$4 cc=.godot/global_script_class_cache.cfg
+! grep -q "class\": &\"Dot" "$cc" 2>/dev/null || rm -f "$cc" .godot/uid_cache.bin
+imp() { timeout 900 "$g" --headless --path . --import >"$log" 2>&1 </dev/null; }
+if [ ! -f "$cc" ] || [ -n "$(find -L . -path ./.godot -prune -o \( -name "*.import" -o -name "*.glb" -o -name "*.gd" \) -newer "$cc" -print -quit)" ]; then
+	imp
+	if grep -qE "$re" "$log"; then rm -f "$cc" .godot/uid_cache.bin; imp; fi
+fi
+[ -f "$log" ] && grep -qE "$re" "$log" || exit 0
+rm -f "$cc" .godot/uid_cache.bin
+echo "gpu.sh: PARSE ERROR importing ${1##*/} on $(hostname) (log $log); the run was not started:" >&2
+'"$PARSE_REPORT"'
+exit 3'
+# RUN_WATCH (args: window seconds, log, regex, command...) runs the command with its stdout and stderr passed through as
+# before and also copied to the log (~/gpu/run.<project>.log). For the first GPU_PARSE_WINDOW seconds (default 120, 0 = the
+# whole run) it watches the log for RUN_ERR_RE, a script that failed to compile; on a match it prints the errors, kills the
+# run's process group (timeout, xvfb-run, godot) and exits 3. Runtime SCRIPT ERRORs are not matched: those runs finish.
+RUN_WATCH='w=$1 log=$2 re=$3; shift 3
+: >"$log"
+setsid "$@" > >(tee -a "$log") 2> >(tee -a "$log" >&2) &
+p=$!
+while kill -0 "$p" 2>/dev/null; do
+	if grep -qE "$re" "$log"; then
+		sleep 1
+		echo "gpu.sh: PARSE ERROR in the run on $(hostname) (log $log), stopped it:" >&2
+		'"$PARSE_REPORT"'
+		kill -TERM -- -"$p" 2>/dev/null; sleep 3; kill -KILL -- -"$p" 2>/dev/null
+		exit 3
+	fi
+	(( w > 0 && SECONDS >= w )) && break
+	sleep 1
+done
+wait "$p"; rc=$?
+wait
+exit "$rc"'
+
 # GPU_RELEASE=1 (run): bench a release export instead of the editor binary. Production ships --export-release, and a release build
 # runs the client frame ~27% faster than the editor's debug build (FC, 32 players, 12.7 -> 9.2 ms), so frame times quoted for a
 # shipped game must come from one. tools/gpu-release-export.sh (run on the box) exports the synced project once per content
@@ -2218,7 +2263,9 @@ case "${1:-}" in
 		# first, headless, whenever the class cache is missing or a source is newer than it (new glbs left
 		# "Cannot open file .godot/imported/...scn" on a box that had imported before).
 		# Shared, not exclusive: an import needs no GPU and must not stop the box taking suites (remote_shared).
-		remote_shared "import.$project" bash -c "cd $(printf '%q' "$REMOTE_HOME/$REMOTE_ROOT/$project") && { ! grep -q 'class\": &\"Dot' .godot/global_script_class_cache.cfg 2>/dev/null || rm -f .godot/global_script_class_cache.cfg .godot/uid_cache.bin; [ -f .godot/global_script_class_cache.cfg ] && [ -z \"\$(find -L . -path ./.godot -prune -o \\( -name \"*.import\" -o -name \"*.glb\" -o -name \"*.gd\" \\) -newer .godot/global_script_class_cache.cfg -print -quit)\" ] || timeout 900 $REMOTE_HOME/gpu/bin/godot --headless --path . --import >/dev/null 2>&1 </dev/null; }; true" || return
+		# A parse error there exits 3 with the errors printed (RUN_IMPORT), instead of a run that idles until GPU_TIMEOUT.
+		remote_shared "import.$project" bash -c "$RUN_IMPORT" run-import "$REMOTE_HOME/$REMOTE_ROOT/$project" \
+			"$REMOTE_HOME/gpu/bin/godot" "$REMOTE_HOME/gpu/run-import.$project.log" "$IMPORT_ERR_RE" || return
 		idx=$GPU_INDEX
 		[[ -n $idx ]] || idx=$("${SSHQ[@]}" "vulkaninfo --summary 2>/dev/null | awk '/^GPU[0-9]+:/ {g=substr(\$1,4)+0} /deviceName.*NVIDIA/ {print g; exit}'" 2>/dev/null) || true
 		local xrun=(xvfb-run -a -s "-screen 0 1920x1080x24")
@@ -2247,7 +2294,8 @@ case "${1:-}" in
 			run_release "$project" "${xrun[@]}" -- "${drv[@]}" -- "$@"
 			return
 		fi
-		remote_locked timeout -k 15 "${GPU_TIMEOUT:-1800}" "${xrun[@]}" \
+		remote_locked bash -c "$RUN_WATCH" run-watch "${GPU_PARSE_WINDOW:-120}" "$REMOTE_HOME/gpu/run.$project.log" "$RUN_ERR_RE" \
+			timeout -k 15 "${GPU_TIMEOUT:-1800}" "${xrun[@]}" \
 			"$REMOTE_HOME/gpu/bin/godot" --path "$REMOTE_HOME/$REMOTE_ROOT/$project" \
 			"${drv[@]}" "$@"
 		}
