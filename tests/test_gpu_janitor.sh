@@ -12,10 +12,14 @@ touch -d "4 days ago" "$g/ws/fresh" "$g/ws/fresh/fresh"   # recent file deep ins
 old "$g/sib/lib/aaa1" "9 days ago"; old "$g/sib/lib/bbb2" "8 days ago"; old "$g/sib/lib/ccc3" "7 days ago"
 ln -s "$g/sib/lib/aaa1" "$g/ws/locked/lib"; ln -s ccc3 "$g/sib/lib/latest"
 touch -h -d "4 days ago" "$g/ws/locked" "$g/ws/locked/lib"
+mkdir -p "$g/godot"/{stale,live} "$g/py/root/home/u/wt"/{stale,fresh}
+for s in godot/stale godot/live py/root/home/u/wt/stale py/root/home/u/wt/fresh; do echo x > "$g/$s/f"; done
+old "$g/godot/stale" "6 days ago"; old "$g/godot/live" "6 days ago"; old "$g/py/root/home/u/wt/stale" "6 days ago"
 : > "$g/suite/locked.lock"
 echo 90 > "$tmp/used"
 ( exec 9>>"$g/suite/locked.lock"; flock -n 9; sleep 30 ) & sleep 1
 ( cd "$g/ws/proc/proc" && exec sleep 30 ) & sleep 0.5
+( cd "$g/godot/live" && exec sleep 30 ) & sleep 0.5
 env GPU_DIR=$g FAKE_USED=$tmp/used HOME=$tmp "$here/tools/janitor.sh"
 fail=0
 ck() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=$((fail+1)); fi; }
@@ -28,5 +32,8 @@ ck "sib version linked from a workspace kept" '[ -d "$g/sib/lib/aaa1" ]'
 ck "sib latest kept" '[ -d "$g/sib/lib/ccc3" ]'
 ck "unused sib version removed" '[ ! -d "$g/sib/lib/bbb2" ]'
 ck "removals logged" 'grep -q "rm ws/idle-older" "$g/janitor.log" && grep -q "rm sib/lib/bbb2" "$g/janitor.log"'
+ck "stale staged godot/py copies removed" '[ ! -d "$g/godot/stale" ] && [ ! -d "$g/py/root/home/u/wt/stale" ]'
+ck "staged copy with a process cwd kept" '[ -d "$g/godot/live" ]'
+ck "fresh staged py copy kept" '[ -d "$g/py/root/home/u/wt/fresh" ]'
 ck "keeps logged" 'grep -q "keep ws/proc" "$g/janitor.log"'
 exit $((fail>0))

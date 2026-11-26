@@ -57,6 +57,18 @@ prune_ws() { # prune_ws <min idle minutes> <stop once disk % used is below this 
 		rm -rf "$d" && say "rm ws/$p ($sz, idle ${age} min, $(used)% used before)"
 	done < <(oldest_first ws/*/)
 }
+prune_staged() { # prune_staged <min idle minutes> <stop below % (0 = never)>: godot/<wt> and py/root/home/*/wt/<wt>,
+	# the copies gpu.sh stages for godot and python jobs (no lock; restaged on next use). Never one touched or referenced.
+	local d age sz
+	while IFS= read -r d; do
+		[ -n "$d" ] || continue
+		[ "$2" != 0 ] && [ "$(used)" -lt "$2" ] && return
+		touched "$d" "$(( $1 > ACTIVE_MIN ? $1 : ACTIVE_MIN ))" && continue
+		referenced "$PWD/$d" && { say "keep $d (a running process references it)"; continue; }
+		age=$(( ($(date +%s) - $(stat -c %Y "$d")) / 60 )); sz=$(size "$d")
+		rm -rf "$d" && say "rm $d ($sz, idle ${age} min, $(used)% used before)"
+	done < <(oldest_first godot/*/ py/root/home/*/wt/*/)
+}
 sib_in_use() { # sib_in_use <name> <version dir>
 	local l
 	for l in ws/*/"$1"; do [ -L "$l" ] && [ "$(readlink -f "$l")" = "$(readlink -f "$2")" ] && return 0; done
@@ -88,13 +100,16 @@ done
 
 # Always: old workspaces, old logs, temp.
 prune_ws $((WS_DAYS * 1440)) 0
+prune_staged $((WS_DAYS * 1440)) 0
 find suite -maxdepth 1 -type f \( -name '*.log' -o -name '*.ls-files' \) -mtime +3 -delete 2>/dev/null
 [ -z "${FAKE_USED:-}" ] && find /tmp -maxdepth 1 -user "$(id -un)" -mtime +1 -exec rm -rf {} + 2>/dev/null
 
 [ "$(used)" -ge "$SOFT" ] && prune_ws 60 "$SOFT"
+[ "$(used)" -ge "$SOFT" ] && prune_staged 60 "$SOFT"
 if [ "$(used)" -ge "$HARD" ]; then
 	say "HARD prune starting at $(used)% used"
 	prune_ws "$ACTIVE_MIN" $((HARD - 10))
+	[ "$(used)" -ge $((HARD - 10)) ] && prune_staged "$ACTIVE_MIN" $((HARD - 10))
 	[ "$(used)" -ge $((HARD - 10)) ] && prune_sib
 	[ "$(used)" -ge $((HARD - 10)) ] && [ -z "${FAKE_USED:-}" ] && rm -rf "$HOME/.cache/"* 2>/dev/null
 	say "HARD prune done at $(used)% used"
