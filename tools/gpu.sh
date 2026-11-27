@@ -1336,9 +1336,12 @@ echo "$free $slots $avail $state"') _ $SUITE_SLOTS $DESKTOP_GUARD $SUITE_RESERVE
 # workspace has no .godot yet, seeds it with a copy of the repository's .godot (the main
 # checkout's workspace, else the newest workspace of another worktree of the same repo):
 # a cold import of game-fatal-contact is ~3 min and ~600 MB per new worktree, the copy makes it
-# incremental. A copy, not hardlinks: Godot rewrites its cache files in place. The source is
-# skipped while a suite holds its lock, and the class/uid caches are dropped so the import
-# that REMOTE_SUITE runs first rebuilds them for this tree. Never fails the offer.
+# incremental. .godot/imported is hard-linked, the rest copied: Godot writes every file to a temporary
+# and renames it into place (FileAccessUnix, import_heal's <file>-XXXXXX), so a reimport in one copy
+# replaces its own link and never touches the other copies, and up to SUITE_VARIANTS+1 copies of a
+# worktree share one ~1.8 GB import cache instead of each holding its own (PH filled its disk with
+# them, 2026-11-27). The source is skipped while a suite holds its lock, and the class/uid caches are
+# dropped so the import that REMOTE_SUITE runs first rebuilds them for this tree. Never fails the offer.
 read -r -d '' SEED_WS <<'EOF' || true
 set -u
 project=$1 repo=$2 wsid=${3:-$1}
@@ -1367,7 +1370,9 @@ done
 [ -n "$src" ] || exit 0
 tmp=ws/$wsid/.godot-seed.$$
 rm -rf "$tmp"
-if cp -a --reflink=auto "ws/$src/${src%%~*}/.godot" "$tmp" 2>/dev/null; then
+sg=ws/$src/${src%%~*}/.godot
+if mkdir -p "$tmp" && (cd "$sg" && find . -mindepth 1 -maxdepth 1 ! -name imported -exec cp -a --reflink=auto {} "$OLDPWD/$tmp/" \;) 2>/dev/null \
+	&& { [ ! -d "$sg/imported" ] || cp -al "$sg/imported" "$tmp/imported" 2>/dev/null || { rm -rf "$tmp/imported"; cp -a --reflink=auto "$sg/imported" "$tmp/imported"; }; }; then
 	rm -rf "$tmp/test-logs" "$tmp/global_script_class_cache.cfg" "$tmp/uid_cache.bin"
 	# Never pass on an output a full disk cut short in the source (import_heal, from GUARD_FN).
 	n=$(import_heal "$tmp/imported"); [ "${n:-0}" = 0 ] || echo "gpu.sh: dropped $n cut-short import outputs from $src's .godot before seeding $wsid" >&2
