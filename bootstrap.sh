@@ -19,7 +19,7 @@
 #   ./bootstrap.sh --only fc,wipeout   only these, plus the addon and map repos they need
 #   ./bootstrap.sh --no-stores              skip the raw art stores (about 1.6 GB, fetched once and kept); maps draw low-detail art
 #   ./bootstrap.sh --only 'mg-*' --no-deps  only these, and nothing they need
-#   ./bootstrap.sh --full-clones         clone map and pack repos (*-maps, *-pack) with full history too; by default they are blobless (history fetched on demand), several times faster
+#   ./bootstrap.sh --full-clones         clone asset repos (*-maps, *-pack, projects.tsv's bootstrap-blobless list) with full history too; by default they are blobless (history fetched on demand), several times faster
 #   ./bootstrap.sh --fetch-jobs N        content downloads in flight at once (default 8; GS_FETCH_JOBS; 0 = unlimited, 1 = one at a time)
 #   ./bootstrap.sh --jobs N              repositories synced and games imported at once (default: the CPU count; GS_JOBS; 1 = one at a time)
 #   ./bootstrap.sh --import              import every game headless (the editor can crash on a first import); --only narrows it
@@ -359,14 +359,18 @@ current_addon_dir() { case "$1" in arena_weapons) echo fc_weapons ;; esac; }
 
 ONLY=()
 NO_DEPS=0
-# Map and pack repositories (*-maps, *-pack) are content nobody develops in: a blobless
-# clone (history's file contents fetched on demand) takes a fraction of the time and
-# still pulls, fetches and checks out lock-pinned tags. Games and addons stay full.
-# --full-clones / GS_FULL_CLONES=1 opts out.
+# Asset repositories are cloned blobless (history's file contents fetched on demand): it
+# takes a fraction of the time and still pulls, fetches and checks out lock-pinned tags.
+# Map and pack repositories (*-maps, *-pack) are by name; the rest (fc-weapons and the
+# other weapon and monster packs) are the names on projects.tsv's "# bootstrap-blobless:"
+# lines, which says why. Games and addons stay full. --full-clones / GS_FULL_CLONES=1 opts out.
 clone_filter() {
     [ "$FULL_CLONES" = "1" ] && return
-    case "$1" in *-maps|*-pack) echo "--filter=blob:none" ;; esac
+    case "$1" in *-maps|*-pack) echo "--filter=blob:none"; return ;; esac
+    blobless_listed | grep -qxF -- "$1" && echo "--filter=blob:none"
+    return 0
 }
+blobless_listed() { sed -n 's/^#[[:space:]]*bootstrap-blobless:[[:space:]]*//p' "$LIST" | tr -s ' \t' '\n\n' | grep -v '^$'; }
 
 # Repositories synced and games imported at once; --jobs N, GS_JOBS, else the CPU count.
 FULL_CLONES="${GS_FULL_CLONES:-0}"
@@ -764,8 +768,8 @@ sync_repo() {
             fi
         fi
 
-        local clone_err
-        if clone_err="$(git clone -q $(clone_filter "$proj") "$effective" "$dir" 2>&1 >/dev/null)"; then
+        local clone_err filter; filter="$(clone_filter "$proj")"
+        if clone_err="$(git clone -q ${filter:+"$filter"} "$effective" "$dir" 2>&1 >/dev/null)"; then
             # A repository created on GitHub and never pushed to clones fine and
             # has no HEAD, so rev-parse fails. Say so rather than leaking its
             # "fatal: Needed a single revision" to the terminal.

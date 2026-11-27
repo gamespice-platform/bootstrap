@@ -19,7 +19,7 @@
         .\bootstrap.ps1 -Only 'mg-*' -NoDeps    only these, and nothing they need
         .\bootstrap.ps1 -NoStores              do not fetch the raw art stores (about 1.6 GB, once, kept); maps draw low-detail art. Or $env:GS_STORES_FROM = 'none'
         $env:GS_NATIVES = 'none'               skip the native libraries a game pins (# bootstrap-natives: in its .gitignore); GDScript runs
-        .\bootstrap.ps1 -FullClones            clone map and pack repos (*-maps, *-pack) with full history too; by default they are blobless (fetched on demand), several times faster
+        .\bootstrap.ps1 -FullClones            clone asset repos (*-maps, *-pack, projects.tsv's bootstrap-blobless list) with full history too; by default they are blobless (fetched on demand), several times faster
         .\bootstrap.ps1 -FetchJobs N          content downloads in flight at once (default 8; 0 = unlimited, 1 = one at a time)
         .\bootstrap.ps1 -Jobs N                repositories synced and games imported at most N at once (default: the CPU count; 1 = one at a time)
         .\bootstrap.ps1 -Import                 import every game headless (the editor can crash on a first import); -Only narrows it
@@ -272,6 +272,16 @@ function Get-Projects {
         }
 }
 
+# Asset repositories cloned blobless (history's file contents fetched on demand): *-maps and
+# *-pack by name, the rest named on projects.tsv's "# bootstrap-blobless:" lines.
+# -FullClones / GS_FULL_CLONES=1 opts out. bootstrap.sh's clone_filter is the same rule.
+function Test-Blobless ($n) {
+    if ($env:GS_FULL_CLONES -eq '1') { return $false }
+    if ($n -like '*-maps' -or $n -like '*-pack') { return $true }
+    $listed = Get-Content $listFile | ForEach-Object { if ($_ -match '^#\s*bootstrap-blobless:\s*(.*)$') { $Matches[1] -split '\s+' } } | Where-Object { $_ }
+    return [bool]($listed -contains $n)
+}
+
 # The listed name an other name (third column) stands for: a legacy id -> its current name.
 function Get-AliasTarget ($n) {
     $hit = Get-Projects | Where-Object { $_.Aliases -contains $n } | Select-Object -First 1
@@ -474,9 +484,10 @@ function Sync-Many ($items) {
         NetErr = ${function:Test-NetError}.ToString()
         Pull = ${function:Invoke-PullRetry}.ToString()
         Repair = ${function:Repair-Checkout}.ToString()
+        Blob = ${function:Test-Blobless}.ToString()
     }
     $shared = [hashtable]::Synchronized(@{ https = $script:useHttps })
-    $ctx = @{ dir = $projectsDir; hub = $Hub; discard = [bool]$DiscardGenerated }
+    $ctx = @{ dir = $projectsDir; hub = $Hub; discard = [bool]$DiscardGenerated; list = $listFile }
     $worker = {
         param($d, $c, $sh, $name, $url)
         $buf = New-Object 'System.Collections.Generic.List[object]'
@@ -493,7 +504,8 @@ function Sync-Many ($items) {
         ${function:Test-NetError}      = [scriptblock]::Create($d.NetErr)
         ${function:Invoke-PullRetry}   = [scriptblock]::Create($d.Pull)
         ${function:Repair-Checkout}    = [scriptblock]::Create($d.Repair)
-        $projectsDir = $c.dir; $Hub = $c.hub; $DiscardGenerated = $c.discard
+        ${function:Test-Blobless}      = [scriptblock]::Create($d.Blob)
+        $projectsDir = $c.dir; $Hub = $c.hub; $DiscardGenerated = $c.discard; $listFile = $c.list
         $script:useHttps = $sh.https
         Sync-Repo $name $url
         if ($script:useHttps) { $sh.https = $true }
@@ -773,7 +785,7 @@ function Sync-Repo ($proj, $url) {
             }
         }
 
-        $filter = if ($env:GS_FULL_CLONES -ne '1' -and ($proj -like '*-maps' -or $proj -like '*-pack')) { @('--filter=blob:none') } else { @() }
+        $filter = if (Test-Blobless $proj) { @('--filter=blob:none') } else { @() }
         $cloneErr = @(git clone -q @filter $effective $dir 2>&1 | ForEach-Object { "$_" })
         if ($LASTEXITCODE -eq 0) {
             # A repository created on GitHub and never pushed to clones fine and

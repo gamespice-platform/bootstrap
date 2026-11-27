@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Tests tools/install-valve-hooks.sh against the real GameSpice Cloud guard.
 #   GUARD_SRC=/path/to/gs-cloud/tools/check_valve_files.py tests/test_install_valve_hooks.sh
-# Defaults to the sibling gs-cloud checkout. Fails loudly when the guard cannot be found.
+# Defaults to GS_CLOUD's guard, else the sibling gs-cloud checkout. Fails loudly when the guard cannot be found.
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 installer="$here/../tools/install-valve-hooks.sh"
-guard_src="${GUARD_SRC:-$here/../../gs-cloud/tools/check_valve_files.py}"
+guard_src="${GUARD_SRC:-${GS_CLOUD:-$here/../../gs-cloud}/tools/check_valve_files.py}"
+# The installer reads GS_CLOUD (and GS_PROJECTS) itself. A caller that exports them -- the test runner does, for
+# test_partial_clone.sh -- would point every case below at its gs-cloud instead of the one built under $P, so the
+# cases that test the default (hook names $P's guard, no duplicate line, missing guard exits 2) failed. Only the
+# GS_CLOUD case sets it, explicitly.
+unset GS_CLOUD GS_PROJECTS
 [ -f "$guard_src" ] || { echo "FAIL: no guard at $guard_src (set GUARD_SRC)" >&2; exit 2; }
 guard_src="$(cd "$(dirname "$guard_src")" && pwd)/$(basename "$guard_src")"
 
