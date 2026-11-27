@@ -19,6 +19,8 @@
         .\bootstrap.ps1 -Only 'mg-*' -NoDeps    only these, and nothing they need
         .\bootstrap.ps1 -NoStores              do not fetch the raw art stores (about 1.6 GB, once, kept); maps draw low-detail art. Or $env:GS_STORES_FROM = 'none'
         $env:GS_NATIVES = 'none'               skip the native libraries a game pins (# bootstrap-natives: in its .gitignore); GDScript runs
+        .\bootstrap.ps1 -FullClones            clone map and pack repos (*-maps, *-pack) with full history too; by default they are blobless (fetched on demand), several times faster
+        .\bootstrap.ps1 -FetchJobs N          content downloads in flight at once (default 8; 0 = unlimited, 1 = one at a time)
         .\bootstrap.ps1 -Jobs N                repositories synced and games imported at most N at once (default: the CPU count; 1 = one at a time)
         .\bootstrap.ps1 -Import                 import every game headless (the editor can crash on a first import); -Only narrows it
         .\bootstrap.ps1 -GetGodot               download the latest stable Godot into .godot-bin beside this script, then carry on (sync, and -Import if given); every mode that runs Godot looks there
@@ -107,6 +109,8 @@ param(
     [switch]$NoDeps,
     [int]$Jobs = [Environment]::ProcessorCount,
     [switch]$NoStores,
+    [switch]$FullClones,
+    [int]$FetchJobs = -1,
     [switch]$DiscardGenerated,
     [switch]$Import,
     [switch]$GetGodot,
@@ -128,6 +132,9 @@ param(
 $ProgressPreference = 'SilentlyContinue'
 
 $ErrorActionPreference = 'Continue'
+# Environment, not parameters: the parallel sync's runspaces (and the fetcher) see these, not script variables.
+if ($FullClones) { $env:GS_FULL_CLONES = '1' }
+if ($FetchJobs -ge 0) { $env:GS_FETCH_JOBS = "$FetchJobs" }
 $repoDir = $PSScriptRoot
 $gsDownload = Join-Path $repoDir 'tools\gs_download.ps1'
 . $gsDownload
@@ -766,7 +773,8 @@ function Sync-Repo ($proj, $url) {
             }
         }
 
-        $cloneErr = @(git clone -q $effective $dir 2>&1 | ForEach-Object { "$_" })
+        $filter = if ($env:GS_FULL_CLONES -ne '1' -and ($proj -like '*-maps' -or $proj -like '*-pack')) { @('--filter=blob:none') } else { @() }
+        $cloneErr = @(git clone -q @filter $effective $dir 2>&1 | ForEach-Object { "$_" })
         if ($LASTEXITCODE -eq 0) {
             # A repository created on GitHub and never pushed to clones fine and
             # has no HEAD, so rev-parse fails. Say so rather than leaking its

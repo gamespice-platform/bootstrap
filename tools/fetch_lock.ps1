@@ -1,11 +1,13 @@
 # THE one fetcher on Windows: fetch exactly what a repo's content.lock.json names, hash-checked, once (present files skipped).
-#   .\tools\fetch_lock.ps1 <content.lock.json> [-Root DIR] [-From BASE] [-Cdn URL] [-Cfg DIR] [-Except a,b] [-Only a,b] [-Packs DIR] [-List] [-TrustDevCa]
+#   .\tools\fetch_lock.ps1 <content.lock.json> [-Root DIR] [-From BASE] [-Cdn URL] [-Cfg DIR] [-Except a,b] [-Only a,b] [-Packs DIR] [-Jobs N] [-List] [-TrustDevCa]
 # -TrustDevCa ($env:GS_TRUST_DEV_CA=1): when the CDN is the dev one on the TMC local CA (https://x-tmc-storez) and Windows does not trust it, import
 # <cdn>/tmc-local-ca.crt into Cert:\CurrentUser\Root (tools\gs_cdn.ps1); without it an interactive run asks first.
 # Same behaviour as fetch_lock.sh, which documents the lock, the item names (id, name half, into, kind, repo; globs) and the cfg/content
 # rules. Where from, first set wins: -From, $env:GS_PACKS_FROM ('none' fetches nothing), -Cdn / $env:GS_CDN_URL, GS_CDN_URL in
+# -Jobs N / $env:GS_FETCH_JOBS (default 8): downloads in flight at once across all packs; 0 = unlimited, 1 = one file at a time as before.
+# Every file is still hash-checked and a failed pack is named on the error stream (exit 1) while the others carry on.
 # gs-bootstrap\.env, the lock's origin and mirrors, https://content.gamespice.net. (-Skip is the older name of -Except.)
-param([Parameter(Mandatory)][string]$Lock, [string]$Root, [string]$From, [string]$Cdn, [string]$Cfg, [string]$Packs,
+param([Parameter(Mandatory)][string]$Lock, [string]$Root, [string]$From, [string]$Cdn, [string]$Cfg, [string]$Packs, [int]$Jobs = -1,
       [Alias('Skip')][string[]]$Except = @(), [string[]]$Only = @(), [switch]$List, [switch]$TrustDevCa)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'  # never PowerShell's progress bar (it slows 5.1 to a crawl); gs_download.ps1 prints our own
@@ -31,65 +33,7 @@ if ($Packs) { New-Item -ItemType Directory -Force -Path $Packs | Out-Null; $Pack
 $bases = if ($From) { @($From) } elseif ($doc.origin) { @($doc.origin) + @($doc.mirrors) } else { @('https://content.gamespice.net/content') }
 $bases = @($bases | ForEach-Object { $_.TrimEnd('/') })
 
-function Get-Sha([string]$p) { (Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToLower() }
-
-function Test-Gzip([string]$p) {
-    $fs = [IO.File]::OpenRead($p)
-    try { $h = New-Object byte[] 2; ($fs.Read($h, 0, 2) -eq 2) -and $h[0] -eq 0x1f -and $h[1] -eq 0x8b } finally { $fs.Dispose() }
-}
-function Expand-Gzip([string]$p) {
-    $tmp = "$p.gunzip"
-    $in = [IO.File]::OpenRead($p); $out = [IO.File]::Create($tmp)
-    try { $gz = New-Object IO.Compression.GZipStream($in, [IO.Compression.CompressionMode]::Decompress); $gz.CopyTo($out); $gz.Dispose() }
-    finally { $out.Dispose(); $in.Dispose() }
-    Move-Item -Force $tmp $p
-}
-
-# The manifest hash expected from base $b: the entry's manifest_sha256_by_origin[$b] when present, else manifest_sha256 (as fetch_lock.sh).
-# Renamed CDN hosts, old=new, as fetch_lock.sh: $env:GS_ORIGIN_ALIASES replaces the list (space separated); empty turns it off.
-$aliasList = if ($null -ne $env:GS_ORIGIN_ALIASES) { $env:GS_ORIGIN_ALIASES } else { 'https://dotgames.org=https://content.gamespice.net' }
-$Aliases = @($aliasList -split '\s+' | Where-Object { $_ -match '=' } | ForEach-Object { , ($_ -split '=', 2) })
-function Canon([string]$u) {
-    $u = $u.TrimEnd('/')
-    foreach ($a in $Aliases) {
-        $old = $a[0].TrimEnd('/')
-        if ($u -eq $old -or $u.StartsWith("$old/")) { return $a[1].TrimEnd('/') + $u.Substring($old.Length) }
-    }
-    $u
-}
-function Pin($p, [string]$b) {
-    if ($p.manifest_sha256_by_origin) { foreach ($o in $p.manifest_sha256_by_origin.PSObject.Properties) { if ((Canon $o.Name) -eq (Canon $b)) { return $o.Value } } }
-    $p.manifest_sha256
-}
-
-# One object to $dest through $dest.part, hash-checked; 4 tries over the bases. A part a broken connection left is
-# resumed (Range), one that fails its hash is dropped. $prog: the pack's progress line (bytes and file i/n).
-function Fetch([string]$rel, [string]$dest, [string]$sha, $entry = $null, $prog = $null) {
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
-    $part = "$dest.part"
-    for ($i = 0; $i -lt 4; $i++) {
-        $b = $bases[$i % $bases.Count]
-        $sha = if ($entry) { Pin $entry $b } else { $sha }
-        $before = if ($prog) { $prog.Done } else { 0 }
-        try {
-            if ($b -match '^[a-z]+://') { Invoke-GSDownload "$b/$rel" $part -Progress $prog -Resume }
-            else {
-                Copy-Item -LiteralPath (Join-Path $b $rel) $part -Force
-                if ($prog) { $prog.Done += (Get-Item -LiteralPath $part).Length; Write-GSProgress $prog }
-            }
-            # The site stores some objects gzip-encoded and a CDN may send them as-is; the sha256 names the decoded bytes.
-            if ((Get-Sha $part) -ne $sha -and (Test-Gzip $part)) { Expand-Gzip $part }
-            if ((Get-Sha $part) -eq $sha) { Move-Item -Force $part $dest; return }
-            Remove-Item -Force $part
-            throw "hash mismatch for $b/$rel"
-        } catch {
-            if ($prog) { $prog.Done = $before }
-            if ($i -eq 3) { throw }
-            Write-Host "retry $b/$rel ($($_.Exception.Message))" -ForegroundColor DarkYellow
-            Start-Sleep -Seconds ([math]::Pow(2, $i))
-        }
-    }
-}
+. (Join-Path $PSScriptRoot 'fetch_object.ps1')
 
 # The download lists: remove: entries, and the pack: entries of a list without merge: true (what fetch_lock.sh reads the same way).
 if (-not $Cfg -and (Test-Path (Join-Path $lockDir 'cfg'))) { $Cfg = Join-Path $lockDir 'cfg' }
@@ -131,7 +75,13 @@ function Why($p) {
     ''
 }
 
-$bad = 0
+if ($Jobs -lt 0) { $Jobs = if ($env:GS_FETCH_JOBS -match '^\d+$') { [int]$env:GS_FETCH_JOBS } else { 8 } }
+# .NET Framework allows 2 connections per host unless told otherwise, which would make every -Jobs above 2 a lie.
+[Net.ServicePointManager]::DefaultConnectionLimit = if ($Jobs -gt 0) { [math]::Max($Jobs, 2) } else { 1000 }
+
+# Phase 1, one pack at a time (small): decide what is needed and fetch the manifest. Phase 2: every missing file of every pack
+# goes to one pool of -Jobs runspaces. Phase 3 (as each pack's last file lands): stamp it, or report it FAILED.
+$bad = 0; $ctxs = @(); $queue = @()
 foreach ($p in $doc.packs) {
     $kind = if ($p.kind) { $p.kind } else { 'pack' }
     $why = Why $p
@@ -149,10 +99,11 @@ foreach ($p in $doc.packs) {
         $pad = (Get-Content -Raw $man | ConvertFrom-Json).payload.Replace('-', '+').Replace('_', '/')
         $pad += '=' * ((4 - $pad.Length % 4) % 4)
         $files = ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($pad)) | ConvertFrom-Json).files
+        $seen = @{}
         $todo = @(foreach ($f in $files) {
             if ($f.path.StartsWith('/') -or ($f.path -split '/') -contains '..') { throw "unsafe path $($f.path)" }
             $obj = "$pre/objects/$($f.sha256.Substring(0,2))/$($f.sha256)"
-            if ($kind -eq 'pack') { $dest = Join-Path $out "objects/$($f.sha256.Substring(0,2))/$($f.sha256)"; if (Test-Path $dest) { continue } }
+            if ($kind -eq 'pack') { $dest = Join-Path $out "objects/$($f.sha256.Substring(0,2))/$($f.sha256)"; if ((Test-Path $dest) -or $seen[$dest]) { continue }; $seen[$dest] = $true }
             else { $dest = Join-Path $out $f.path; if ((Test-Path $dest) -and ((Get-Item $dest).Length -eq $f.size)) { continue } }
             [pscustomobject]@{ Obj = $obj; Dest = $dest; Sha = $f.sha256; Size = [long]$f.size }
         })
@@ -161,13 +112,62 @@ foreach ($p in $doc.packs) {
             $already = if ($todo.Count -lt $files.Count) { ", $($files.Count - $todo.Count) already here" } else { '' }
             Write-Host ("fetching {0} {1}: {2} files, {3} MB{4}" -f $p.id, $p.version, $todo.Count, (Format-GSSize $bytes), $already)
         }
-        $prog = New-GSProgress $p.id $bytes $todo.Count
-        $k = 0
-        foreach ($t in $todo) { $k++; $prog.File = $k; Fetch $t.Obj $t.Dest $t.Sha $null $prog }
-        Write-GSProgress $prog -Final
-        Set-Content -NoNewline -Path $stamp -Value "$want`n"
-        if ($kind -eq 'store') { Remove-Item -Force $man }
-        Write-Host "fetched $($p.id) $($p.version) $($files.Count) files"
+        $ctx = @{ P = $p; Kind = $kind; Want = $want; Stamp = $stamp; Man = $man; Count = $files.Count; Pending = $todo.Count
+                  Failed = @(); Abort = [hashtable]::Synchronized(@{ Stop = $false }) }
+        $ctxs += $ctx
+        foreach ($t in $todo) { $queue += @{ Ctx = $ctx; T = $t } }
     } catch { Write-Host "FAILED $($p.id) $($p.version) $_" -ForegroundColor Red; $bad++ }
 }
+
+function Complete-Pack($ctx) {
+    $p = $ctx.P
+    if ($ctx.Failed.Count) {
+        Write-Host "FAILED $($p.id) $($p.version) $($ctx.Failed[0])$(if ($ctx.Failed.Count -gt 1) { " (+$($ctx.Failed.Count - 1) more files)" })" -ForegroundColor Red
+        return 1
+    }
+    Set-Content -NoNewline -Path $ctx.Stamp -Value "$($ctx.Want)`n"
+    if ($ctx.Kind -eq 'store') { Remove-Item -Force $ctx.Man }
+    Write-Host "fetched $($p.id) $($p.version) $($ctx.Count) files"
+    0
+}
+
+if ($queue.Count) {
+    $all = New-GSProgress 'content' (($queue | ForEach-Object { $_.T.Size } | Measure-Object -Sum).Sum) $queue.Count
+    $workers = if ($Jobs -gt 0) { [math]::Min($Jobs, $queue.Count) } else { $queue.Count }
+    $pool = [runspacefactory]::CreateRunspacePool(1, $workers); $pool.Open()
+    # One file per runspace call: own progress object (one writer, never prints), the pack's Abort flag stops files still waiting.
+    $worker = {
+        param($tools, $bases, $rel, $dest, $sha, $prog, $abort)
+        $ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'
+        if ($abort.Stop) { return }
+        . (Join-Path $tools 'gs_download.ps1'); . (Join-Path $tools 'fetch_object.ps1')
+        Fetch $rel $dest $sha $null $prog
+    }
+    foreach ($q in $queue) {
+        $q.Prog = New-GSProgress $q.T.Obj $q.T.Size 0; $q.Prog.Next = [double]::MaxValue
+        $q.PS = [powershell]::Create(); $q.PS.RunspacePool = $pool
+        [void]$q.PS.AddScript($worker).AddArgument($PSScriptRoot).AddArgument($bases).AddArgument($q.T.Obj).AddArgument($q.T.Dest).AddArgument($q.T.Sha).AddArgument($q.Prog).AddArgument($q.Ctx.Abort)
+        $q.H = $q.PS.BeginInvoke(); $q.Taken = $false
+    }
+    $left = $queue.Count; $finished = 0
+    while ($left -gt 0) {
+        foreach ($q in $queue) {
+            if ($q.Taken -or -not $q.H.IsCompleted) { continue }
+            $q.Taken = $true; $left--; $ctx = $q.Ctx
+            try { [void]$q.PS.EndInvoke($q.H); if ($q.PS.HadErrors -and $q.PS.Streams.Error.Count) { throw $q.PS.Streams.Error[0].ToString() } }
+            catch { $ctx.Failed += "$($q.T.Obj): $($_.Exception.Message)"; $ctx.Abort.Stop = $true }
+            $q.PS.Dispose(); $ctx.Pending--
+            if ($ctx.Pending -eq 0) { $bad += (Complete-Pack $ctx) }
+        }
+        $all.Done = [long]0; $fin = 0
+        foreach ($q in $queue) { $all.Done += $q.Prog.Done; if ($q.Taken) { $fin++ } }
+        $all.File = $fin
+        Write-GSProgress $all
+        if ($left -gt 0) { Start-Sleep -Milliseconds 200 }
+    }
+    Write-GSProgress $all -Final
+    $pool.Close(); $pool.Dispose()
+}
+# A pack with nothing missing (stamp lost, files all present) is complete without any download.
+foreach ($ctx in $ctxs) { if ($ctx.Pending -eq 0 -and -not $queue.Where({ $_.Ctx -eq $ctx }).Count) { $bad += (Complete-Pack $ctx) } }
 exit ([int]($bad -gt 0))

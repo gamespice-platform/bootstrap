@@ -19,6 +19,8 @@
 #   ./bootstrap.sh --only fc,wipeout   only these, plus the addon and map repos they need
 #   ./bootstrap.sh --no-stores              skip the raw art stores (about 1.6 GB, fetched once and kept); maps draw low-detail art
 #   ./bootstrap.sh --only 'mg-*' --no-deps  only these, and nothing they need
+#   ./bootstrap.sh --full-clones         clone map and pack repos (*-maps, *-pack) with full history too; by default they are blobless (history fetched on demand), several times faster
+#   ./bootstrap.sh --fetch-jobs N        content downloads in flight at once (default 8; GS_FETCH_JOBS; 0 = unlimited, 1 = one at a time)
 #   ./bootstrap.sh --jobs N              repositories synced and games imported at once (default: the CPU count; GS_JOBS; 1 = one at a time)
 #   ./bootstrap.sh --import              import every game headless (the editor can crash on a first import); --only narrows it
 #   ./bootstrap.sh --get-godot          download the latest stable Godot into .godot-bin beside this script; with --import, a selection or --discard-generated it carries on (sync, link, then import)
@@ -357,7 +359,17 @@ current_addon_dir() { case "$1" in arena_weapons) echo fc_weapons ;; esac; }
 
 ONLY=()
 NO_DEPS=0
+# Map and pack repositories (*-maps, *-pack) are content nobody develops in: a blobless
+# clone (history's file contents fetched on demand) takes a fraction of the time and
+# still pulls, fetches and checks out lock-pinned tags. Games and addons stay full.
+# --full-clones / GS_FULL_CLONES=1 opts out.
+clone_filter() {
+    [ "$FULL_CLONES" = "1" ] && return
+    case "$1" in *-maps|*-pack) echo "--filter=blob:none" ;; esac
+}
+
 # Repositories synced and games imported at once; --jobs N, GS_JOBS, else the CPU count.
+FULL_CLONES="${GS_FULL_CLONES:-0}"
 JOBS="${GS_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 DISCARD_GEN=0
 # --min: leave out content (maps, courses, worlds) and the optional packs a game marks
@@ -753,7 +765,7 @@ sync_repo() {
         fi
 
         local clone_err
-        if clone_err="$(git clone -q "$effective" "$dir" 2>&1 >/dev/null)"; then
+        if clone_err="$(git clone -q $(clone_filter "$proj") "$effective" "$dir" 2>&1 >/dev/null)"; then
             # A repository created on GitHub and never pushed to clones fine and
             # has no HEAD, so rev-parse fails. Say so rather than leaking its
             # "fatal: Needed a single revision" to the terminal.
@@ -1686,6 +1698,9 @@ while [ $# -gt 0 ]; do
         --jobs|-j) [ $# -ge 2 ] || { echo "${RED}$1 needs a number${OFF}" >&2; exit 2; }; JOBS="$2"; shift ;;
         --jobs=*)  JOBS="${1#--jobs=}" ;;
         --no-stores) GS_STORES_FROM=none ;;
+        --full-clones) FULL_CLONES=1 ;;
+        --fetch-jobs) [ $# -ge 2 ] || { echo "${RED}$1 needs a number${OFF}" >&2; exit 2; }; export GS_FETCH_JOBS="$2"; shift ;;
+        --fetch-jobs=*) export GS_FETCH_JOBS="${1#--fetch-jobs=}" ;;
         --discard-generated) DISCARD_GEN=1 ;;
         --get-godot) GET_GODOT=1 ;;
         --import)  DO_IMPORT=1 ;;

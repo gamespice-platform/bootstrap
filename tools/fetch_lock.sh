@@ -1,7 +1,10 @@
 #!/bin/bash
 # THE one fetcher: fetch exactly what a repo's content.lock.json names, hash-checked, once (resumable, present files skipped).
 #   tools/fetch_lock.sh <content.lock.json> [--root DIR] [--from BASE|--cdn URL] [--cfg DIR] [--skip|--except ITEM[,ITEM]]
-#                       [--only ITEM[,ITEM]] [--packs DIR] [--list]
+#                       [--only ITEM[,ITEM]] [--packs DIR] [--jobs N] [--list]
+# HOW MANY AT ONCE: --jobs N / GS_FETCH_JOBS (default 8) is the number of downloads in flight, across packs and across the files
+#   of one pack; 0 = unlimited (no hard cap); 1 = one file at a time, packs in lock order, as before. Every file is still
+#   hash-checked, a failure is reported per pack on stderr and the exit code is 1, other packs carry on.
 # Lock (written by gs-cloud's `publish --upload --lock`, format in gs-cloud docs/cdn-publish.md): {format, origin, mirrors[],
 # packs[{id, version, manifest_sha256, into, kind, optional}]}. kind "store" files are written to <root>/<into>; a kind "pack" is
 # mirrored to --packs DIR/<id>/<version>/ (manifest.json + objects/) when given, else left for GSCloudClient to mount.
@@ -20,11 +23,11 @@
 # GS_CDN_CA=<file> trusts one extra CA (the dev CDN's local CA; curl --cacert equivalent). Windows: fetch_lock.ps1 -TrustDevCa.
 # A token file path in GS_PACKS_TOKEN_FILE (never the token itself) is sent as a bearer.
 set -euo pipefail
-LOCK="${1:?usage: fetch_lock.sh <content.lock.json> [--root DIR] [--from BASE|--cdn URL] [--cfg DIR] [--skip IDs] [--only IDs] [--packs DIR] [--list]}"; shift
+LOCK="${1:?usage: fetch_lock.sh <content.lock.json> [--root DIR] [--from BASE|--cdn URL] [--cfg DIR] [--skip IDs] [--only IDs] [--packs DIR] [--jobs N] [--list]}"; shift
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; CFG=""; CDN="${GS_CDN_URL:-}"; LIST=0
 [ -f "$LOCK" ] || { echo "fetch_lock: no $LOCK, nothing pinned"; exit 0; }
 ROOT="$(cd "$(dirname "$LOCK")" && pwd)"
-FROM="${GS_PACKS_FROM:-}"; SKIP=""; ONLY=""; PACKS=""
+FROM="${GS_PACKS_FROM:-}"; SKIP=""; ONLY=""; PACKS=""; JOBS="${GS_FETCH_JOBS:-8}"
 while [ $# -gt 0 ]; do
     case $1 in
         --root) ROOT="$(cd "${2:?}" && pwd)"; shift 2 ;;
@@ -34,15 +37,19 @@ while [ $# -gt 0 ]; do
         --cdn) CDN="${2:?}"; shift 2 ;;
         --cfg) CFG="${2:?}"; shift 2 ;;
         --list) LIST=1; shift ;;
+        --jobs) JOBS="${2:?}"; shift 2 ;;
         --only) ONLY="$ONLY,${2:?}"; shift 2 ;;
         *) echo "fetch_lock: unknown argument $1" >&2; exit 2 ;;
     esac
 done
 [ "${GS_PACKS_FROM:-}" = none ] || [ "$FROM" = none ] && { echo "fetch_lock: GS_PACKS_FROM=none, nothing fetched"; exit 0; }
+case "$JOBS" in ''|*[!0-9]*) echo "fetch_lock: --jobs / GS_FETCH_JOBS needs a number (0 = unlimited), got '$JOBS'" >&2; exit 2 ;; esac
 command -v python3 >/dev/null || { echo "fetch_lock: python3 is needed" >&2; exit 2; }
-exec python3 -I - "$LOCK" "$ROOT" "$FROM" "$SKIP" "$ONLY" "$PACKS" "$HERE" "$CFG" "$CDN" "$LIST" <<'PY'
+exec python3 -I - "$LOCK" "$ROOT" "$FROM" "$SKIP" "$ONLY" "$PACKS" "$HERE" "$CFG" "$CDN" "$LIST" "$JOBS" <<'PY'
 import base64, fnmatch, hashlib, json, math, os, ssl, sys, time, urllib.request, urllib.error, zlib
-lock, root, base, skip, only, packs, here, cfg, cdn, listing = sys.argv[1:11]
+import threading
+from concurrent.futures import ThreadPoolExecutor
+lock, root, base, skip, only, packs, here, cfg, cdn, listing, jobs = sys.argv[1:12]
 skip = {s for s in skip.split(",") if s}; only = {s for s in only.split(",") if s}
 doc = json.load(open(lock))
 if doc.get("format") != 1: sys.exit("fetch_lock: unsupported lock format")
@@ -151,7 +158,10 @@ except ValueError: EVERY = 2.0
 def eta(s):
     s = int(math.ceil(s))
     return "%dh%02dm" % (s // 3600, s % 3600 // 60) if s >= 3600 else "%dm%02ds" % (s // 60, s % 60) if s >= 60 else "%ds" % s
+PLOCK = threading.Lock()   # progress counters are shared by the files of a pack downloading at once
 def show(pg, final=False):
+    with PLOCK: _show(pg, final)
+def _show(pg, final=False):
     sec = time.monotonic() - pg["t0"]
     if final:
         if not pg["shown"]: return
@@ -165,11 +175,21 @@ def show(pg, final=False):
     pg["shown"] = True
     print("%-22s %s" % (pg["name"], msg), flush=True)
 
+CONC = int(jobs)                      # 0 = unlimited
+SEM = threading.BoundedSemaphore(CONC) if CONC > 0 else None
+def credit(pg, n):
+    if pg:
+        with PLOCK: pg["done"] += n
+
 def fetch(rel, dest, sha, retries=4, pg=None):
+    if SEM is None: return _fetch(rel, dest, sha, retries, pg)
+    with SEM: return _fetch(rel, dest, sha, retries, pg)
+
+def _fetch(rel, dest, sha, retries=4, pg=None):
     part = dest + ".part"
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     for attempt in range(retries):
-        before = pg["done"] if pg else 0
+        mine = 0   # bytes this attempt added to the pack's total, taken back if it fails
         url = bases[attempt % len(bases)] + "/" + rel
         try:
             have = os.path.getsize(part) if os.path.exists(part) else 0
@@ -181,14 +201,15 @@ def fetch(rel, dest, sha, retries=4, pg=None):
             gz = r.headers.get("Content-Encoding", "").lower() == "gzip"
             if gz and have: r.close(); r = get(url); have = 0
             if have and getattr(r, "status", 200) != 206: have = 0
-            if pg: pg["done"] += have
+            credit(pg, have); mine += have
             z = zlib.decompressobj(31) if gz else None
             with open(part, "ab" if have else "wb") as f:
                 while True:
                     b = r.read(1 << 20)
                     if not b: break
                     f.write(z.decompress(b) if z else b)
-                    if pg: pg["done"] += len(b); show(pg)
+                    credit(pg, len(b)); mine += len(b)
+                    if pg: show(pg)
                 if z: f.write(z.flush())
             h = hashlib.sha256()
             with open(part, "rb") as f:
@@ -198,7 +219,7 @@ def fetch(rel, dest, sha, retries=4, pg=None):
             os.remove(part)
             raise IOError("hash mismatch for " + url)
         except (urllib.error.URLError, IOError, OSError) as e:
-            if pg: pg["done"] = before
+            credit(pg, -mine)
             if attempt == retries - 1: raise
             print("retry %s (%s)" % (url, e), flush=True)
             time.sleep(2 ** attempt)
@@ -234,8 +255,26 @@ def dev_latest(pid):
         return v if "-dev." in v else ""
     except Exception: return ""
 
-bad = 0
-for p in doc["packs"]:
+def run_all(calls):
+    # calls: zero-argument functions, each one download (the --jobs cap is SEM, inside fetch). All run; the first failure is
+    # raised after the rest stopped, so a pack is never stamped with a file missing.
+    if not calls: return
+    if CONC == 1:
+        for c in calls: c()
+        return
+    with ThreadPoolExecutor(max_workers=CONC if CONC > 0 else len(calls)) as ex:
+        futs = [ex.submit(c) for c in calls]
+        err = None
+        for f in futs:
+            try: f.result()
+            except Exception as e:
+                if err is None:
+                    err = e
+                    for g in futs: g.cancel()
+        if err: raise err
+
+def do_pack(p):
+    # One lock entry, start to finish. Returns 1 when it failed (reported on stderr), else 0.
     pid, ver, into, kind = p["id"], p["version"], p.get("into", ""), p.get("kind", "pack")
     mh = pinned(p); stamp_sha = mh(bases[0])
     dv = dev_latest(pid) if DEVLATEST and kind == "pack" else ""
@@ -244,26 +283,28 @@ for p in doc["packs"]:
     if kind == "pack" and packs:
         # Mirror the origin's layout (manifest.json + objects/) so a server serves it as published.
         w = wanted(p)
-        if w: print("skip", pid, "(%s)" % w); continue
+        if w: print("skip", pid, "(%s)" % w); return 0
         out = os.path.join(packs, pid, ver); stamp = os.path.join(out, ".gs-pack"); want = "%s %s %s" % (pid, ver, stamp_sha)
-        if os.path.exists(stamp) and open(stamp).read().strip() == want: print("have", pid, ver); continue
+        if os.path.exists(stamp) and open(stamp).read().strip() == want: print("have", pid, ver); return 0
         try:
             fetch("%s/%s/manifest.json" % (pid, ver), os.path.join(out, "manifest.json"), mh)
             pad = json.load(open(os.path.join(out, "manifest.json")))["payload"]; pad += "=" * (-len(pad) % 4)
+            todo = []; seen = set()   # two files with the same bytes are one object: never two writers on one .part
             for f in json.loads(base64.urlsafe_b64decode(pad))["files"]:
                 sha = f["sha256"]; dest = os.path.join(out, "objects", sha[:2], sha)
-                if not os.path.exists(dest): fetch("%s/%s/objects/%s/%s" % (pid, ver, sha[:2], sha), dest, sha)
+                if not os.path.exists(dest) and dest not in seen: seen.add(dest); todo.append(lambda r="%s/%s/objects/%s/%s" % (pid, ver, sha[:2], sha), d=dest, h=sha: fetch(r, d, h))
+            run_all(todo)
             open(stamp, "w").write(want + "\n"); print("mirrored", pid, ver)
         except Exception as e:
-            print("FAILED", pid, ver, e, file=sys.stderr); bad += 1
-        continue
-    if kind != "store": continue
+            print("FAILED", pid, ver, e, file=sys.stderr); return 1
+        return 0
+    if kind != "store": return 0
     w = wanted(p)
-    if w: print("skip", pid, "(%s)" % w); continue
+    if w: print("skip", pid, "(%s)" % w); return 0
     out = os.path.join(root, into); stamp = os.path.join(out, ".gs-pack")
     want = "%s %s %s" % (pid, ver, stamp_sha)
     if os.path.exists(stamp) and open(stamp).read().strip() == want:
-        print("have", pid, ver); continue
+        print("have", pid, ver); return 0
     try:
         pre = "%s/%s" % (pid, ver)
         man = os.path.join(out, ".manifest.json")
@@ -281,14 +322,25 @@ for p in doc["packs"]:
             print("fetching %s %s: %d files, %.1f MB%s" % (pid, ver, len(todo), total / 1048576,
                 ", %d already here" % (n - len(todo)) if len(todo) < n else ""), flush=True)
         pg = {"name": pid, "files": len(todo), "file": 0, "total": total, "done": 0, "t0": time.monotonic(), "next": EVERY, "shown": False}
-        for dest, f in todo:
-            pg["file"] += 1; sha = f["sha256"]
-            fetch("%s/objects/%s/%s" % (pre, sha[:2], sha), dest, sha, pg=pg)
+        def one(dest, f):
+            fetch("%s/objects/%s/%s" % (pre, f["sha256"][:2], f["sha256"]), dest, f["sha256"], pg=pg)
+            with PLOCK: pg["file"] += 1
+        run_all([lambda d=d, f=f: one(d, f) for d, f in todo])
         show(pg, final=True)
         open(stamp, "w").write(want + "\n")
         os.remove(man)
         print("fetched", pid, ver, n, "files")
     except Exception as e:
-        print("FAILED", pid, ver, e, file=sys.stderr); bad += 1
+        print("FAILED", pid, ver, e, file=sys.stderr); return 1
+    return 0
+
+bad = 0
+todo_packs = doc["packs"]
+if CONC == 1 or len(todo_packs) <= 1:
+    for p in todo_packs: bad += do_pack(p)
+else:
+    # Packs at once too: a pack is a few big files or thousands of small ones, and one pack alone rarely fills the link.
+    with ThreadPoolExecutor(max_workers=CONC if CONC > 0 else len(todo_packs)) as ex:
+        bad = sum(ex.map(do_pack, todo_packs))
 sys.exit(1 if bad else 0)
 PY
