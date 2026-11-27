@@ -353,7 +353,15 @@ touch "ws/$src" 2>/dev/null
 at() { [ "$(cat "ws/$src/.tree-hash" 2>/dev/null)" = "$h" ] || { echo "gpu.sh: ws/$src on $(hostname) is not at tree $h $1 the copy into $dest" >&2; exit 5; }; }
 at before
 mkdir -p "$dest" || exit 6
-rsync -a --delete "$@" "ws/$src/$project/" "$dest/" || exit 6
+# Files of GPU_HARDLINK_MIN (256K) and up (maps, models, textures: read-only inputs nothing rewrites in place) are
+# hardlinks to the ~src copy, smaller ones (.import, cfg, scripts, which a job may rewrite in place) are copies. A copy
+# shares no bytes, so a filesystem without hardlinks (or GPU_HARDLINK=0) falls back to the plain full copy.
+here=$PWD
+if [ "${GPU_HARDLINK:-1}" != 0 ] && rsync -a --delete --min-size="${GPU_HARDLINK_MIN:-256K}" --link-dest="$here/ws/$src/$project" "$@" "ws/$src/$project/" "$dest/" 2>/dev/null; then
+	rsync -a --delete --max-size="$(( $(numfmt --from=iec "${GPU_HARDLINK_MIN:-256K}") - 1 ))" "$@" "ws/$src/$project/" "$dest/" || exit 6
+else
+	rsync -a --delete "$@" "ws/$src/$project/" "$dest/" || exit 6
+fi
 at after
 touch "$dest" 2>/dev/null
 exit 0
@@ -1648,6 +1656,9 @@ offer_on() {
 	fi
 	infra_kill "$rc" "$oom" "${JOB_ARGS[@]}" && { lane_pid=; back_to_queue "the infra kill on $BOX is not this job's result"; }
 	infra_reset "${JOB_ARGS[@]}"
+	# The job's lock is released: drop this name's older ws copies (~N) the box no longer needs, newest kept (3.5 GB each).
+	# janitor.sh owns the rules (a held lock, a process using it or a touch within ACTIVE_MIN keeps a copy); a box without it skips this.
+	[[ ${GPU_WS_GC:-1} == 0 ]] || "${SSHQ[@]}" '[ -x gpu/janitor.sh ] && gpu/janitor.sh dups' </dev/null >/dev/null 2>&1 || true
 	exit "$rc"
 }
 

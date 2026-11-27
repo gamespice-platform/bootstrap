@@ -7,6 +7,9 @@
 #   - something under it was modified in the last ACTIVE_MIN minutes (a rsync stage writes before the lock is taken),
 #   - a running process has it as cwd or mentions it on its command line (godot, rsync, bash -lc ...),
 #   - (sib versions) a ws/*/<name> symlink points at it, or it is what sib/<name>/latest points at.
+# Newest per name: ws/<name>, ws/<name>~2 ... ~N are copies of one worktree, so only the newest of them is kept (the older ones
+# only seed .godot imports, and cost ~3.5 GB each); the ws/<name>~src upload cache is exempt. Older copies still obey every
+# rule above. (Since 2026-11-27 gpu.sh also does this when a job ends.)
 # Pruning goes oldest-idle-first and stops as soon as the disk is below the level for that pass. Everything removed or
 # kept-while-needed is written to janitor.log.
 set -u
@@ -14,7 +17,7 @@ cd "${GPU_DIR:-$HOME/gpu}" 2>/dev/null || exit 0
 WS_DAYS=${WS_DAYS:-1}            # idle workspaces older than this go
 SOFT=${SOFT_PCT:-60}             # above this % used: idle workspaces (>1 h) go, oldest first, until below this
 HARD=${HARD_PCT:-80}             # above this %: idle workspaces, unused sib versions and caches go, until below HARD-10
-ACTIVE_MIN=${ACTIVE_MIN:-30}     # anything touched within this many minutes is in use, whatever the pressure
+ACTIVE_MIN=${ACTIVE_MIN:-10}     # anything touched within this many minutes is in use, whatever the pressure
 log=${JANITOR_LOG:-$PWD/janitor.log}
 used() { if [ -n "${FAKE_USED:-}" ]; then cat "$FAKE_USED"; else df --output=pcent / | tail -1 | tr -dc 0-9; fi; }
 say() { echo "$(date +%F\ %T) $*" >> "$log"; }
@@ -57,6 +60,24 @@ prune_ws() { # prune_ws <min idle minutes> <stop once disk % used is below this 
 		rm -rf "$d" && say "rm ws/$p ($sz, idle ${age} min, $(used)% used before)"
 	done < <(oldest_first ws/*/)
 }
+ws_base() { local b=${1%/}; b=${b##*/}; b=${b%~src}; echo "${b%%~[0-9]*}"; } # ws/foo~3/ -> foo
+prune_dups() { # prune_dups <stop once disk % used is below this (0 = never stop)>: all but the newest copy of each name
+	local d p b sz age
+	local -A top=()
+	# newest first: the first copy seen per name is the one kept
+	while IFS= read -r d; do
+		[ -n "$d" ] || continue
+		p=$(basename "$d"); [[ $p == *~src ]] && continue
+		b=$(ws_base "$d")
+		if [ -z "${top[$b]:-}" ]; then top[$b]=$p; continue; fi
+		[ "$1" != 0 ] && [ "$(used)" -lt "$1" ] && return
+		touched "$d" "$ACTIVE_MIN" && continue
+		idle "$p" || { say "keep ws/$p (older copy of $b, but a job holds its lock)"; continue; }
+		referenced "$PWD/$d" && { say "keep ws/$p (older copy of $b, but a running process references it)"; continue; }
+		age=$(( ($(date +%s) - $(stat -c %Y "$d")) / 60 )); sz=$(size "$d")
+		rm -rf "$d" && say "rm ws/$p ($sz, older copy of $b, newest is ws/${top[$b]}, idle ${age} min, $(used)% used before)"
+	done < <(oldest_first ws/*/ | tac)
+}
 prune_staged() { # prune_staged <min idle minutes> <stop below % (0 = never)>: godot/<wt> and py/root/home/*/wt/<wt>,
 	# the copies gpu.sh stages for godot and python jobs (no lock; restaged on next use). Never one touched or referenced.
 	local d age sz
@@ -92,6 +113,9 @@ prune_sib() { # old versions of each sibling, oldest first, never the newest, ne
 	done
 }
 
+# `janitor.sh dups`: only the newest-per-name pass, which gpu.sh runs when a job ends (GPU_WS_GC=0 there turns it off).
+[ "${1:-}" = dups ] && { prune_dups 0; exit 0; }
+
 # Hung or orphaned jobs: the runner caps a suite at 90 min, so anything older than 3 h is stuck.
 for pid in $(pgrep -u "$(id -u)" -f 'gpu/bin/godot|Xvfb'); do
 	et=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
@@ -100,6 +124,7 @@ done
 
 # Always: old workspaces, old logs, temp.
 prune_ws $((WS_DAYS * 1440)) 0
+prune_dups 0
 prune_staged $((WS_DAYS * 1440)) 0
 find suite -maxdepth 1 -type f \( -name '*.log' -o -name '*.ls-files' \) -mtime +3 -delete 2>/dev/null
 [ -z "${FAKE_USED:-}" ] && find /tmp -maxdepth 1 -user "$(id -un)" -mtime +1 -exec rm -rf {} + 2>/dev/null
@@ -108,7 +133,8 @@ find suite -maxdepth 1 -type f \( -name '*.log' -o -name '*.ls-files' \) -mtime 
 [ "$(used)" -ge "$SOFT" ] && prune_staged 60 "$SOFT"
 if [ "$(used)" -ge "$HARD" ]; then
 	say "HARD prune starting at $(used)% used"
-	prune_ws "$ACTIVE_MIN" $((HARD - 10))
+	prune_dups $((HARD - 10))
+	[ "$(used)" -ge $((HARD - 10)) ] && prune_ws "$ACTIVE_MIN" $((HARD - 10))
 	[ "$(used)" -ge $((HARD - 10)) ] && prune_staged "$ACTIVE_MIN" $((HARD - 10))
 	[ "$(used)" -ge $((HARD - 10)) ] && prune_sib
 	[ "$(used)" -ge $((HARD - 10)) ] && [ -z "${FAKE_USED:-}" ] && rm -rf "$HOME/.cache/"* 2>/dev/null
