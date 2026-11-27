@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# box-janitor.sh: keeps a build/test box (ph-tmc-dev, 320 GB disk) under budget. Runs from cron every 10 min as gamedev.
+# box-janitor.sh: keeps a build/test box (ph-tmc-dev: ~/gpu on the 9.8 TB /mnt/bulk) under budget; percentages are of the disk ~/gpu is on. Runs from cron every 10 min as gamedev.
 # Source of truth is gs-bootstrap/tools/janitor.sh; the box copy is ~/gpu/janitor.sh (install: cp it there, chmod +x).
 # Every file under ~/gpu is a copy staged by gpu.sh or a cache, so deleting is recoverable, but a job that loses its workspace
 # mid-run fails, so a workspace or sibling version is NEVER removed while it is live. Live means any of:
@@ -19,7 +19,7 @@ SOFT=${SOFT_PCT:-60}             # above this % used: idle workspaces (>1 h) go,
 HARD=${HARD_PCT:-80}             # above this %: idle workspaces, unused sib versions and caches go, until below HARD-10
 ACTIVE_MIN=${ACTIVE_MIN:-10}     # anything touched within this many minutes is in use, whatever the pressure
 log=${JANITOR_LOG:-$PWD/janitor.log}
-used() { if [ -n "${FAKE_USED:-}" ]; then cat "$FAKE_USED"; else df --output=pcent / | tail -1 | tr -dc 0-9; fi; }
+used() { if [ -n "${FAKE_USED:-}" ]; then cat "$FAKE_USED"; else df --output=pcent . | tail -1 | tr -dc 0-9; fi; }
 say() { echo "$(date +%F\ %T) $*" >> "$log"; }
 
 idle() { # idle <wsid>: true when no job holds its lock
@@ -36,8 +36,11 @@ snapshot() { # one "cwd<TAB>cmdline" line per process, refreshed when older than
 	done); snap_t=$(date +%s)
 }
 referenced() { # referenced <abs path>: a live process has it as cwd or on its command line
+	# ~/gpu may be a symlink (PH: /mnt/bulk/gamedev/gpu since 2026-11-27): a cwd reads as the physical path, a command
+	# line as the logical one, so match either.
 	snapshot
-	[ -n "$(printf '%s\n' "$snap" | grep -F -m1 -- "$1")" ]
+	local phys; phys=$(readlink -f -- "$1" 2>/dev/null) || phys=$1
+	[ -n "$(printf '%s\n' "$snap" | grep -F -m1 -e "$1" -e "$phys")" ]
 }
 touched() { # touched <dir> <minutes>: anything inside changed within that many minutes
 	[ -n "$(find "$1" -mmin -"$2" -print -quit 2>/dev/null)" ]
@@ -144,7 +147,7 @@ fi
 tail -n 500 "$log" > "$log.tmp" 2>/dev/null && mv "$log.tmp" "$log"
 {
 	echo "time: $(date -Is)"
-	echo "disk: $(used)% used of $(df -h --output=size / | tail -1 | tr -d ' ')"
+	echo "disk: $(used)% used of $(df -h --output=size . | tail -1 | tr -d ' ')"
 	echo "ws: $(du -sh ws 2>/dev/null | cut -f1)  sib: $(du -sh sib 2>/dev/null | cut -f1)  home: $(du -sh "$HOME" 2>/dev/null | cut -f1)"
 	echo "mem: $(awk '/MemAvailable/ {print int($2/1048576)}' /proc/meminfo) GB available, load $(cut -d' ' -f1 /proc/loadavg)"
 } > health.txt
