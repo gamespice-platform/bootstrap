@@ -44,6 +44,17 @@
 # cloning the sources it needs before gs-bootstrap is on it.
 #
 # A project named game-* has a playable client: `bootstrap --play <name>`.
+#
+# BLOBLESS CLONES. A repository that is mostly assets is cloned with --filter=blob:none: every
+# commit and tree comes down, but only the files the checkout needs; an old version of a file
+# is fetched the first time something (log -p, blame, a checkout of an old tag) asks for it.
+# Map and pack repositories (*-maps, *-pack) are blobless by their name. The others are the
+# names on the bootstrap-blobless lines below: weapon and monster packs whose history is
+# mostly superseded models and textures (fc-weapons: 967 MB of history for a 222 MB checkout,
+# 2026-11-27). Add a repository here when its history dwarfs its checkout and code is a small
+# part of it; games and addons stay full clones. `bootstrap --full-clones` clones everything
+# whole. tests/test_clone_mode.sh fails on a name here that is not a project.
+# bootstrap-blobless: fc-weapons zee-gs-weapons zz-modern-weapons zz-medieval-weapons zz-historical-monsters
 gs-2d	git@github.com:gamespice-platform/2d.git	dot-2d
 gs-achievements	git@github.com:gamespice-platform/achievements.git	dot-achievements
 gs-audio	git@github.com:gamespice-platform/audio.git	dot-audio

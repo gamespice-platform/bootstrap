@@ -2,7 +2,7 @@
 # gpu.sh sync_ws (nightly heavy-queue-diag-1): a tree goes to a box once and every workspace of it is filled there from
 # that copy, never from a stale or half-uploaded one. The box is a fake: a directory used as its $HOME, reached through a
 # fake ssh that runs the command there, and an rsync stub that maps "h:<path>" onto it and counts uploads.
-# Real code only: tree_hash, WS_FROM_SRC and sync_ws are cut out of tools/gpu.sh.
+# Real code only: tree_hash, own_hash, WS_FROM_SRC and sync_ws are cut out of tools/gpu.sh.
 set -u
 here=$(cd "$(dirname "$0")/.." && pwd)
 src=${GPU_SRC:-$here/tools/gpu.sh}
@@ -12,8 +12,8 @@ fail=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fail=1; }
 
-fns=$(sed -n '/^tree_hash() {/,/^}/p;/^read -r -d .. WS_FROM_SRC/,/^EOF$/p;/^box_lock() {/,/^}/p;/^box_unlock() {/,/^}/p;/^sync_tree() {/,/^}/p;/^sync_ws() {/p;/^sync_dir_once() {/,/^}/p;/^sync_loopsafe() {/,/^}/p;/^loop_links() {/,/^}/p;/^unresolved_links() {/,/^}/p;/^unresolved_except_loops() {/,/^}/p' "$src")
-[[ $fns == *"tree_hash() {"* && $fns == *WS_FROM_SRC* && $fns == *"sync_ws() {"* && $fns == *"box_lock() {"* && $fns == *"sync_tree() {"* ]] || { echo "FAIL could not cut the sync code out of $src"; exit 1; }
+fns=$(sed -n '/^tree_hash() {/,/^}/p;/^own_hash() {/,/^}/p;/^read -r -d .. WS_FROM_SRC/,/^EOF$/p;/^box_lock() {/,/^}/p;/^box_unlock() {/,/^}/p;/^sync_tree() {/,/^}/p;/^sync_ws() {/p;/^sync_dir_once() {/,/^}/p;/^sync_loopsafe() {/,/^}/p;/^loop_links() {/,/^}/p;/^unresolved_links() {/,/^}/p;/^unresolved_except_loops() {/,/^}/p' "$src")
+[[ $fns == *"tree_hash() {"* && $fns == *"own_hash() {"* && $fns == *WS_FROM_SRC* && $fns == *"sync_ws() {"* && $fns == *"box_lock() {"* && $fns == *"sync_tree() {"* ]] || { echo "FAIL could not cut the sync code out of $src"; exit 1; }
 
 box=$root/box
 mkdir -p "$box/gpu" "$root/bin"
