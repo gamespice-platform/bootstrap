@@ -1557,8 +1557,9 @@ export_natives() {
 # carries it, so export_game copies the .cfg and its release library into
 # <out>/<cfg name>/, the place GSNetNative looks beside the executable. One line per
 # addons/*/native/*.cfg holding an entry_symbol: "<cfg>\t<library path relative to the
-# cfg>"; the path is empty when it names none for <os> x86_64. Optional by design (the
-# addon falls back to GDScript), so a missing one is a warning, not a failed export.
+# cfg>"; the path is empty when it names none for <os> x86_64. A missing one fails the
+# export (GS_NATIVES=none exports without): the addon would fall back to GDScript and the
+# release would say so only in one log warning.
 export_runtime_natives() {
     local dir="$1" os="$2" cfg
     for cfg in "$dir"/addons/*/native/*.cfg; do
@@ -1580,7 +1581,8 @@ bundle_runtime_natives() {
         name="$(basename "$cfg" .cfg)"; dest="$out/$name"
         rm -rf "${dest:?}"
         if [ -z "$lib" ] || [ ! -s "$(dirname "$cfg")/$lib" ]; then
-            echo "${YLW}$name: no ${os} x86_64 library${lib:+ ($lib)} in the project, so the build runs its GDScript fallback. Run ./bootstrap.sh to fetch it.${OFF}" >&2
+            echo "${RED}$name: no ${os} x86_64 library${lib:+ ($lib)} in the project, so the build would run its GDScript fallback. Run ./bootstrap.sh to fetch it (GS_NATIVES=none exports without).${OFF}" >&2
+            [ "${GS_NATIVES:-}" = none ] || return 1
             continue
         fi
         mkdir -p "$dest/$(dirname "$lib")" && cp "$cfg" "$dest/" && cp "$(dirname "$cfg")/$lib" "$dest/$lib" || return 1
