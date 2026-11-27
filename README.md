@@ -1,5 +1,7 @@
 The first thing to run. It clones the projects of the [**GameSpice**](https://gamespice.net) family (games, addons, maps), links each addon into the projects that use it, and gets you to a running game. Part of the [GameSpice](https://github.com/gamespice-platform) family.
 
+These are plain shell and PowerShell scripts, MIT licensed and built with Claude Code. The `tests/` folder checks them. The games in [Zee's Games](https://zeesgames.com) run on live servers, and this is the script that gets a fresh machine from nothing to one of them running.
+
 Each GameSpice project is its own Git repository on purpose: an addon is used by copying its `addons/<name>/` folder. These scripts are the one place that knows which repositories exist and which addons each one needs.
 
 | File | Platform |
@@ -190,9 +192,9 @@ These are for people working on the family itself.
 | `fetch_all.sh`, `make_fetch_scripts.sh` | See "Fetching content". |
 | `gpu.sh`, `heavy`, `realtime_suites.conf` | Run heavy jobs on the shared GPU and build boxes. The comments in each file explain the options. |
 
-## Status
+## Used by
 
-Built and maintained with Claude Code. The test suites pass, but little of this has been in front of real players yet. Please report rough edges by opening an issue.
+Nobody vendors it, because it is a set of scripts and not an addon. It is how you get any of the games and the addons they use onto your machine. The whole collection is at [zeesgames.com](https://zeesgames.com).
 
 ## Licence
 
