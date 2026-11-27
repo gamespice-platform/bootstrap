@@ -326,6 +326,21 @@ tree_hash() {
 	} | md5sum | cut -c1-32
 }
 
+# own_hash <dir> [<left-out path>...]: tree_hash of the worktree's own entries only. Links are not followed (each counts
+# by its target path, %l) and *.import / *.uid files, which any local --import rewrites, are left out. sync_tree compares
+# it across an upload, so an agent re-importing a SHARED addon checkout that this worktree links (gs_props, gs_sim lib,
+# ...) no longer makes the upload fail with "changed during its upload" (nightly hv-same-wt-race-1, 2026-11-27); a real
+# edit to the worktree's own files, or a link pointed elsewhere, still uploads again.
+own_hash() {
+	local d=${1%/} p pr=(); shift
+	[[ -d $d ]] || return 1
+	for p in "$@"; do pr+=(-o -path "./$p"); done
+	{ printf 'x %s\n' "$@"
+	  ( cd "$d/" && LC_ALL=C find . \( -type d \( -name .godot -o -name .git -o -name screenshots \) "${pr[@]}" \) -prune \
+		-o \( -name '*.import' -o -name '*.uid' \) -o -printf '%y %m %s %T@ %P %l\n' 2>/dev/null ) | LC_ALL=C sort
+	} | md5sum | cut -c1-32
+}
+
 # Runs on the box: fills ws/<wsid>/<project> from ws/<src>/<project> when the stamp there is the tree dev02 hashed.
 read -r -d '' WS_FROM_SRC <<'EOF' || true
 set -u
@@ -376,7 +391,7 @@ box_unlock() {
 # all go through it, laptop included.
 sync_tree() {
 	local dir=$1 name=$2 dest=$3; shift 3
-	local ex=("$@") paths=() i src="$name~src" h h2 st= try fd q rc t0=$SECONDS
+	local ex=("$@") paths=() i src="$name~src" h h2 o o2 st= try fd q rc t0=$SECONDS
 	local filt=(--exclude '.godot/' --exclude '.git/' --exclude 'screenshots/' "${ex[@]}")
 	if [[ ${GPU_SYNC_ONCE:-1} == 0 ]]; then
 		"${SSHQ[@]}" "mkdir -p gpu/$dest" </dev/null || return 1
@@ -403,9 +418,14 @@ sync_tree() {
 		st=
 		for try in 1 2 3; do
 			"${SSHQ[@]}" "mkdir -p gpu/ws/$src/$name && rm -f gpu/ws/$src/.tree-hash" </dev/null || break
+			o=$(own_hash "$dir" "${paths[@]}") || break
 			rsync -az --delete --copy-links "${filt[@]}" -e "$RSH" "$dir/" "$HOST:gpu/ws/$src/$name/" || break
 			h2=$(tree_hash "$dir" "${paths[@]}") || break
-			if [[ $h2 == "$h" ]]; then
+			o2=$(own_hash "$dir" "${paths[@]}") || break
+			# Only linked (shared) trees or import outputs changed: keep this copy and stamp it with the hash taken before
+			# it, which the tree no longer has, so the next job uploads the delta instead of trusting a mixed copy.
+			[[ $h2 != "$h" && $o2 == "$o" ]] && echo "gpu.sh: linked or imported files under $dir changed during its upload to $BOX (another agent's import of a shared addon?); keeping this copy" >&2
+			if [[ $h2 == "$h" || $o2 == "$o" ]]; then
 				"${SSHQ[@]}" "printf '%s\n' $h > gpu/ws/$src/.tree-hash" </dev/null && st=$h
 				break
 			fi
