@@ -1350,13 +1350,20 @@ echo "$free $slots $avail $state"') _ $SUITE_SLOTS $DESKTOP_GUARD $SUITE_RESERVE
 # worktree share one ~1.8 GB import cache instead of each holding its own (PH filled its disk with
 # them, 2026-11-27). The source is skipped while a suite holds its lock, and the class/uid caches are
 # dropped so the import that REMOTE_SUITE runs first rebuilds them for this tree. Never fails the offer.
+# A 4th argument is another destination, relative to ~/gpu: `run` seeds godot/<project> with it (2026-11-27). Before, a run
+# of a worktree PH had never run imported every asset cold into godot/<project> (30+ min for FC at PH's load, past the
+# bench's setup timeout) even when a suite workspace of the same worktree or repo held a finished import.
 read -r -d '' SEED_WS <<'EOF' || true
 set -u
-project=$1 repo=$2 wsid=${3:-$1}
+project=$1 repo=$2 wsid=${3:-$1} dst=${4:-}
 cd ~/gpu 2>/dev/null || exit 1
-dst=ws/$wsid/$project
-mkdir -p "$dst" suite || exit 1
-[ -n "$repo" ] && printf '%s\n' "$repo" > "ws/$wsid/.repo"
+if [ -n "$dst" ]; then
+	mkdir -p "$dst" suite || exit 1
+else
+	dst=ws/$wsid/$project
+	mkdir -p "$dst" suite || exit 1
+	[ -n "$repo" ] && printf '%s\n' "$repo" > "ws/$wsid/.repo"
+fi
 [ -e "$dst/.godot" ] && exit 0
 # Sources, best first: this worktree's own first workspace (a second copy, ~N, of the same tree imports
 # almost nothing), the repository's main checkout, the newest workspace of the same repository. A
@@ -1376,7 +1383,7 @@ for p in $cands; do
 	exec 6>&-
 done
 [ -n "$src" ] || exit 0
-tmp=ws/$wsid/.godot-seed.$$
+tmp=$dst/.godot-seed.$$
 rm -rf "$tmp"
 sg=ws/$src/${src%%~*}/.godot
 if mkdir -p "$tmp" && (cd "$sg" && find . -mindepth 1 -maxdepth 1 ! -name imported -exec cp -a --reflink=auto {} "$OLDPWD/$tmp/" \;) 2>/dev/null \
@@ -2294,6 +2301,12 @@ case "${1:-}" in
 		# `pull` reads this to look on the box that ran it.
 		mkdir -p "$HOME/.cache" && echo "$BOX" > "$HOME/.cache/gpu-last-box.$project" || return
 		sync_project "$project" || return
+		# Seed godot/<project>/.godot from a finished import on the box (this worktree's suite workspace, else its repo's), as
+		# offer_on does for a suite workspace, so the import below is incremental instead of cold. Never fails the run.
+		local repo=
+		repo=$(git -C "$(proj_src "$project")" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && repo=$(basename "$(dirname "$repo")") || repo=
+		[[ $repo =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]] || repo=
+		timeout -k 5 300 "${SSH[@]}" "bash -c $(printf '%q' "$GUARD_FN"$'\n'"$SEED_WS") _$(printf '%q ' "$project" "$repo" "run:$project" "${REMOTE_ROOT#gpu/}/$project")" </dev/null || true
 		# A project directory the box has not seen has no .godot (sync leaves it out), and a
 		# non-editor run of that never finishes: it spun for 24 minutes holding the lock. Import
 		# first, headless, whenever the class cache is missing or a source is newer than it (new glbs left
