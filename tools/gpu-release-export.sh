@@ -13,7 +13,8 @@ src=$HOME/gpu/godot/$project
 godot=$HOME/gpu/bin/godot
 base=$HOME/gpu/rel
 mkdir -p "$base"
-key=$( { echo "$scene"; cd "$src" && find . -path ./.godot -prune -o -type f -printf '%p %s %T@\n' | LC_ALL=C sort; } | sha1sum | cut -c1-12)
+# "natives-2": exports from before runtime natives were bundled beside the executable must not be reused.
+key=$( { echo "$scene natives-2"; cd "$src" && find . -path ./.godot -prune -o -type f -printf '%p %s %T@\n' | LC_ALL=C sort; } | sha1sum | cut -c1-12)
 out=$base/$project-$key
 if [[ -x $out/game.x86_64 ]]; then
 	echo "gpu release: cached export $out" >&2
@@ -51,6 +52,23 @@ if ! timeout -k 20 1500 "$godot" --headless --path . --export-release "Linux ben
 	exit 1
 fi
 grep -a -E "^(ERROR|SCRIPT ERROR)" "$tmp/export.log" | head -5 >&2 || true
+# A library an addon loads itself from a .cfg (gs-net's snapshot core: addons/gs_net/native/gs_net_native.cfg) is never
+# in the pck; GSNetNative looks for <exe dir>/<cfg name>/<cfg>. bootstrap.sh's export_game copies it there and so does
+# this: without it the bench measures the addon's GDScript fallback ("native snapshots unavailable"). Missing = refused.
+for cfg in addons/*/native/*.cfg; do
+	[[ -f $cfg ]] && grep -q '^[[:space:]]*entry_symbol' "$cfg" || continue
+	name=$(basename "$cfg" .cfg)
+	lib=$(awk -F= '/^[[:space:]]*[#;]/ {next} {k=$1; gsub(/[[:space:]]/,"",k)}
+		k=="linux.release.x86_64" {v=$0; sub(/^[^"]*"/,"",v); sub(/".*$/,"",v); print v; exit}' "$cfg")
+	if [[ -z $lib || ! -s $(dirname "$cfg")/$lib ]]; then
+		echo "gpu release: REFUSED: $cfg has no linux release library${lib:+ ($(dirname "$cfg")/$lib is missing)}, so the build would run $name's GDScript fallback; fetch it with bootstrap.sh" >&2
+		rm -rf "$tmp"
+		exit 1
+	fi
+	mkdir -p "$tmp/$name/$(dirname "$lib")"
+	cp "$cfg" "$tmp/$name/" && cp "$(dirname "$cfg")/$lib" "$tmp/$name/$lib"
+	echo "gpu release: bundled $name/$lib" >&2
+done
 mv "$tmp" "$out"
 # keep the newest 3 exports of this project
 ls -dt "$base/$project"-[0-9a-f]* 2>/dev/null | tail -n +4 | xargs -r rm -rf
