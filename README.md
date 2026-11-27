@@ -194,6 +194,10 @@ These are for people working on the family itself.
 
 ## Used by
 
+### Zee's Games
+
+Zee's Games is a collection of games I made on GameSpice, for demonstration and for fun. They show what the platform can do, and they run on live servers you can join. Anybody can create games on GameSpice, and everything in the family is its own repository and can be used separately from the games.
+
 Nobody vendors it, because it is a set of scripts and not an addon. It is how you get any of the games and the addons they use onto your machine. The whole collection is at [zeesgames.com](https://zeesgames.com).
 
 ## Licence
