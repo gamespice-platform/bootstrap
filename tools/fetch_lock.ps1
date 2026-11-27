@@ -9,6 +9,9 @@
 # gs-bootstrap\.env, the lock's origin and mirrors, https://content.gamespice.net. (-Skip is the older name of -Except.)
 param([Parameter(Mandatory)][string]$Lock, [string]$Root, [string]$From, [string]$Cdn, [string]$Cfg, [string]$Packs, [int]$Jobs = -1,
       [Alias('Skip')][string[]]$Except = @(), [string[]]$Only = @(), [switch]$List, [switch]$TrustDevCa)
+# -File passes `-Only a,b` as ONE string "a,b"; split it so both forms of calling work (5.1 and 7).
+$Only = @($Only | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+$Except = @($Except | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'  # never PowerShell's progress bar (it slows 5.1 to a crawl); gs_download.ps1 prints our own
 . (Join-Path $PSScriptRoot 'gs_download.ps1')
@@ -120,7 +123,7 @@ foreach ($p in $doc.packs) {
 }
 
 function Complete-Pack($ctx) {
-    $p = $ctx.P
+    $p = $ctx.P; $ctx.Done = $true
     if ($ctx.Failed.Count) {
         Write-Host "FAILED $($p.id) $($p.version) $($ctx.Failed[0])$(if ($ctx.Failed.Count -gt 1) { " (+$($ctx.Failed.Count - 1) more files)" })" -ForegroundColor Red
         return 1
@@ -131,6 +134,23 @@ function Complete-Pack($ctx) {
     0
 }
 
+if ($queue.Count -and $Jobs -eq 1) {
+    # -Jobs 1: the original one-at-a-time path, in this process, with each pack's own "file i/n" progress line.
+    foreach ($ctx in $ctxs) {
+        $mine = @($queue | Where-Object { $_.Ctx -eq $ctx })
+        if (-not $mine.Count) { continue }
+        $prog = New-GSProgress $ctx.P.id (($mine | ForEach-Object { $_.T.Size } | Measure-Object -Sum).Sum) $mine.Count
+        $k = 0
+        foreach ($q in $mine) {
+            $k++; $prog.File = $k
+            try { Fetch $q.T.Obj $q.T.Dest $q.T.Sha $null $prog } catch { $ctx.Failed += "$($q.T.Obj): $($_.Exception.Message)"; break }
+        }
+        Write-GSProgress $prog -Final
+        $ctx.Pending = 0
+        $bad += (Complete-Pack $ctx)
+    }
+    $queue = @()
+}
 if ($queue.Count) {
     $all = New-GSProgress 'content' (($queue | ForEach-Object { $_.T.Size } | Measure-Object -Sum).Sum) $queue.Count
     $workers = if ($Jobs -gt 0) { [math]::Min($Jobs, $queue.Count) } else { $queue.Count }
@@ -156,6 +176,7 @@ if ($queue.Count) {
             $q.Taken = $true; $left--; $ctx = $q.Ctx
             try { [void]$q.PS.EndInvoke($q.H); if ($q.PS.HadErrors -and $q.PS.Streams.Error.Count) { throw $q.PS.Streams.Error[0].ToString() } }
             catch { $ctx.Failed += "$($q.T.Obj): $($_.Exception.Message)"; $ctx.Abort.Stop = $true }
+            foreach ($i in $q.PS.Streams.Information) { Write-Host "$i" -ForegroundColor DarkYellow }   # retry notes written inside the runspace
             $q.PS.Dispose(); $ctx.Pending--
             if ($ctx.Pending -eq 0) { $bad += (Complete-Pack $ctx) }
         }
@@ -169,5 +190,5 @@ if ($queue.Count) {
     $pool.Close(); $pool.Dispose()
 }
 # A pack with nothing missing (stamp lost, files all present) is complete without any download.
-foreach ($ctx in $ctxs) { if ($ctx.Pending -eq 0 -and -not $queue.Where({ $_.Ctx -eq $ctx }).Count) { $bad += (Complete-Pack $ctx) } }
+foreach ($ctx in $ctxs) { if (-not $ctx.Done -and $ctx.Pending -eq 0) { $bad += (Complete-Pack $ctx) } }
 exit ([int]($bad -gt 0))

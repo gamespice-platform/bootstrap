@@ -103,6 +103,9 @@ if command -v pwsh >/dev/null; then
     [ $rc = 0 ] && [ "$(flight)" = 1 ]; ok "ps1 -Jobs 1: one at a time ($(flight))" $?
     clean; pwsh -NoProfile -File "$SRC/tools/fetch_lock.ps1" "$L" -Cdn $CDN -Jobs 8 >"$T/pwb" 2>&1; rc=$?
     [ $rc = 1 ] && grep -q 'FAILED o/zz-bad' "$T/pwb" && grep -q 'FAILED o/zz-gone' "$T/pwb" && [ -f "$T/repo/.zz-a/.gs-pack" ] && [ ! -e "$T/repo/.zz-bad/.gs-pack" ]; ok "ps1: bad packs FAILED + exit 1, good pack stamped" $?
+    clean; pwsh -NoProfile -File "$SRC/tools/fetch_lock.ps1" "$L" -Cdn $CDN -Jobs 1 >"$T/pw1b" 2>&1; rc=$?
+    [ $rc = 1 ] && grep -q 'FAILED o/zz-bad' "$T/pw1b" && grep -q 'hash mismatch' "$T/pw1b" && grep -q 'FAILED o/zz-gone' "$T/pw1b" && [ -f "$T/repo/.zz-a/.gs-pack" ] && [ ! -e "$T/repo/.zz-bad/.gs-pack" ]; ok "ps1 -Jobs 1: hash mismatch FAILED loudly + exit 1, good packs stamped" $?
+    grep -q 'hash mismatch' "$T/pwb"; ok "ps1 -Jobs 8: hash mismatch named in the failure" $?
 else
     echo "pwsh not found: fetch_lock.ps1 parallel half skipped"
 fi

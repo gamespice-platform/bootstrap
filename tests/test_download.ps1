@@ -42,13 +42,19 @@ Check 'Range sent' ($log -match 'GET /big HTTP/1.1 bytes=1000000-')
 $out = & pwsh -NoProfile -NonInteractive -File "$env:H/tools/fetch_lock.ps1" "$T/repo/content.lock.json" -Cdn $U 2>&1 | Out-String
 Check "fetch_lock exit 0 ($LASTEXITCODE)" ($LASTEXITCODE -eq 0)
 Check 'header line' ($out -match 'fetching o/zz-alpha 1\.0\.0: 3 files, 0\.3 MB')
-Check 'file i/n line' ($out -match 'o/zz-alpha\s+file [123]/3  [\d.]+ / 0\.3 MB')
+Check 'file i/n line' ($out -match '(o/zz-alpha|content)\s+file [123]/3  [\d.]+ / 0\.3 MB')
 Check 'hash mismatch retried' ($out -match 'retry .*hash mismatch')
 Check 'files there' ((Get-Content -Raw "$T/repo/.alpha/flaky.txt") -eq 'flaky data' -and (Get-Item "$T/repo/.alpha/a.txt").Length -eq 300000 -and (Test-Path "$T/repo/.alpha/sub/b.txt"))
 Check 'stamped, manifest gone' ((Test-Path "$T/repo/.alpha/.gs-pack") -and -not (Test-Path "$T/repo/.alpha/.manifest.json"))
 Check 'no part left' (-not (Get-ChildItem -Recurse "$T/repo/.alpha" -Filter '*.part'))
 $out2 = & pwsh -NoProfile -NonInteractive -File "$env:H/tools/fetch_lock.ps1" "$T/repo/content.lock.json" -Cdn $U 2>&1 | Out-String
 Check 'second run has it' ($out2 -match 'have o/zz-alpha 1\.0\.0')
+# -Jobs 1 is the original one-at-a-time path: each pack's own "file i/n" line, retries printed, same result.
+Remove-Item -Recurse -Force "$T/repo/.alpha"
+$out3 = & pwsh -NoProfile -NonInteractive -File "$env:H/tools/fetch_lock.ps1" "$T/repo/content.lock.json" -Cdn $U -Jobs 1 2>&1 | Out-String
+Check "-Jobs 1 exit 0 ($LASTEXITCODE)" ($LASTEXITCODE -eq 0)
+Check '-Jobs 1 per-pack file i/n line' ($out3 -match 'o/zz-alpha\s+file [123]/3  [\d.]+ / 0\.3 MB')
+Check '-Jobs 1 files there, stamped' ((Get-Item "$T/repo/.alpha/a.txt").Length -eq 300000 -and (Test-Path "$T/repo/.alpha/.gs-pack"))
 if ($fail) { Write-Host $out }
 Write-Host "test_download: $pass passed, $fail failed"
 exit ([int]($fail -gt 0))
