@@ -10,7 +10,8 @@
 # Newest per name: ws/<name>, ws/<name>~2 ... ~N are copies of one worktree, so only the newest of them is kept (the older ones
 # only seed .godot imports, and cost ~3.5 GB each); the ws/<name>~src upload cache is exempt. Older copies still obey every
 # rule above. (Since 2026-11-27 gpu.sh also does this when a job ends.)
-# Pruning goes oldest-idle-first and stops as soon as the disk is below the level for that pass. Everything removed or
+# Pruning goes oldest-idle-first and stops as soon as the disk is below the level for that pass ("% used" is the larger of
+# space and inode use, so a small-file flood on a big disk triggers pruning too). Everything removed or
 # kept-while-needed is written to janitor.log.
 set -u
 cd "${GPU_DIR:-$HOME/gpu}" 2>/dev/null || exit 0
@@ -19,7 +20,11 @@ SOFT=${SOFT_PCT:-60}             # above this % used: idle workspaces (>1 h) go,
 HARD=${HARD_PCT:-80}             # above this %: idle workspaces, unused sib versions and caches go, until below HARD-10
 ACTIVE_MIN=${ACTIVE_MIN:-10}     # anything touched within this many minutes is in use, whatever the pressure
 log=${JANITOR_LOG:-$PWD/janitor.log}
-used() { if [ -n "${FAKE_USED:-}" ]; then cat "$FAKE_USED"; else df --output=pcent . | tail -1 | tr -dc 0-9; fi; }
+used() { # the fuller of space and inodes: /mnt/bulk on PH ran out of inodes (4 MB/inode ext4) at 2% space used on 2026-11-27
+	if [ -n "${FAKE_USED:-}" ]; then cat "$FAKE_USED"; return; fi
+	local b i; b=$(df --output=pcent . | tail -1 | tr -dc 0-9); i=$(df --output=ipcent . | tail -1 | tr -dc 0-9)
+	[ -n "$i" ] && [ "$i" -gt "$b" ] && b=$i; echo "$b"
+}
 say() { echo "$(date +%F\ %T) $*" >> "$log"; }
 
 idle() { # idle <wsid>: true when no job holds its lock
@@ -147,6 +152,7 @@ fi
 tail -n 500 "$log" > "$log.tmp" 2>/dev/null && mv "$log.tmp" "$log"
 {
 	echo "time: $(date -Is)"
+	echo "inodes: $(df --output=ipcent . | tail -1 | tr -d ' ') used"
 	echo "disk: $(used)% used of $(df -h --output=size . | tail -1 | tr -d ' ')"
 	echo "ws: $(du -sh ws 2>/dev/null | cut -f1)  sib: $(du -sh sib 2>/dev/null | cut -f1)  home: $(du -sh "$HOME" 2>/dev/null | cut -f1)"
 	echo "mem: $(awk '/MemAvailable/ {print int($2/1048576)}' /proc/meminfo) GB available, load $(cut -d' ' -f1 /proc/loadavg)"
