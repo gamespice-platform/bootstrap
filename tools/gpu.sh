@@ -713,24 +713,38 @@ person_here() {
 # prune_stale DAYS APPLY: run in ~/gpu. Removes (APPLY=1) or lists (APPLY=0) the per-worktree
 # copies ws/<id> and shot/<project> whose last use (the directory's own mtime, which a stage
 # touches; rsync -a never moves it) is older than DAYS days. A copy whose lock is held (a
-# running suite or shot) is skipped, and the lock is held during the removal so a job cannot
-# start in a directory being deleted. Never touches sib/, suite/ or the lock files.
+# running suite or shot) is skipped. Each copy's own lock is held only while it is checked again
+# and renamed to <kind>/.gone.<id>.<pid> (one rename, instant), never during the du or the rm -rf
+# of a 30k-file workspace on a loaded disk, which once took minutes with the lock held
+# (2026-11-27). A job that starts on that id afterwards finds no directory and stages afresh, as
+# after a removal. A missing lock file is created first, so the rename is never unlocked. .gone.*
+# left by a killed prune (its pid gone) are removed on the next run. Never touches sib/ or suite/.
 prune_stale() {
-	local days=$1 apply=$2 kind d id lk sz
+	local days=$1 apply=$2 kind d id lk sz gone f
 	[[ $days =~ ^[0-9]+$ ]] || return 0
 	for kind in ws shot; do
+		for gone in "$HOME"/gpu/$kind/.gone.*; do
+			[ -d "$gone" ] && [ ! -L "$gone" ] || continue
+			kill -0 "${gone##*.}" 2>/dev/null || { [ "$apply" = 1 ] && rm -rf "$gone"; }
+		done
 		for d in "$HOME"/gpu/$kind/*/; do
 			d=${d%/}; [ -d "$d" ] && [ ! -L "$d" ] || continue
 			id=${d##*/}
 			[ -n "$(find "$d" -maxdepth 0 -mtime "-$days" 2>/dev/null)" ] && continue
 			if [ $kind = ws ]; then lk=$HOME/gpu/suite/$id.lock; else lk=$HOME/gpu/shot/$id.lock; fi
-			if [ -e "$lk" ]; then
-				exec 5>>"$lk"
-				flock -n 5 || { exec 5>&-; echo "  skip $kind/$id (running)"; continue; }
+			if [ "$apply" != 1 ]; then
+				if [ -e "$lk" ] && ! flock -n "$lk" true 2>/dev/null; then echo "  skip $kind/$id (running)"; continue; fi
+				echo "  would remove $kind/$id ($(du -sh "$d" 2>/dev/null | cut -f1))"
+				continue
 			fi
-			sz=$(du -sh "$d" 2>/dev/null | cut -f1)
-			if [ "$apply" = 1 ]; then rm -rf "$d" && echo "  removed $kind/$id ($sz)"; else echo "  would remove $kind/$id ($sz)"; fi
-			exec 5>&-
+			gone=$HOME/gpu/$kind/.gone.$id.$BASHPID
+			exec {f}>>"$lk" || continue
+			if ! flock -n "$f"; then exec {f}>&-; echo "  skip $kind/$id (running)"; continue; fi
+			# A job may have used it between the age test and the lock.
+			if [ -n "$(find "$d" -maxdepth 0 -mtime "-$days" 2>/dev/null)" ] || ! mv -T "$d" "$gone" 2>/dev/null; then exec {f}>&-; continue; fi
+			exec {f}>&-
+			sz=$(du -sh "$gone" 2>/dev/null | cut -f1)
+			rm -rf "$gone" && echo "  removed $kind/$id ($sz)"
 		done
 	done
 	return 0
@@ -2218,9 +2232,15 @@ case "${1:-}" in
 			echo "== $BOX"
 			"${SSHQ[@]}" "apply=$apply"'; cd ~/gpu/suite 2>/dev/null || { echo "  no suite dir"; exit 0; }
 				for d in */; do d=${d%/}; [ -d "$d" ] || continue; [ "$d" = .shim ] && continue
-					if [ -e "$d.lock" ] && ! flock -n "$d.lock" true 2>/dev/null; then echo "  skip $d (running)"; continue; fi
-					sz=$(du -sh "$d" 2>/dev/null | cut -f1)
-					if [ "$apply" = 1 ]; then rm -rf "$d" && echo "  removed $d ($sz)"; else echo "  would remove $d ($sz)"; fi
+					if [ "$apply" != 1 ]; then
+						if [ -e "$d.lock" ] && ! flock -n "$d.lock" true 2>/dev/null; then echo "  skip $d (running)"; continue; fi
+						echo "  would remove $d ($(du -sh "$d" 2>/dev/null | cut -f1))"; continue
+					fi
+					# The lock is held only for the rename; the du and rm -rf run with it free.
+					exec 5>>"$d.lock" && flock -n 5 || { exec 5>&-; echo "  skip $d (running)"; continue; }
+					g=.gone.$d.$$; mv -T "$d" "$g" || { exec 5>&-; continue; }; exec 5>&-
+					sz=$(du -sh "$g" 2>/dev/null | cut -f1)
+					rm -rf "$g" && echo "  removed $d ($sz)"
 				done' || echo "  (unreachable)"
 			# Per-worktree copies nobody used for GPU_CLEAN_DAYS (default 2) days: ws/<id>, shot/<project>.
 			"${SSHQ[@]}" "bash -c $(printf '%q' "$GUARD_FN"$'\n'"prune_stale ${GPU_CLEAN_DAYS:-2} $apply")" || echo "  (unreachable)"
